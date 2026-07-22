@@ -572,8 +572,8 @@ pub const TryType0Tag = enum(u8) {
 
 /// Payload union for Try.
 pub const TryType0Payload = extern union {
-        err: RocStr,
-        ok: void,
+    err: RocStr,
+    ok: void,
 };
 
 /// Tag union: Try
@@ -613,8 +613,8 @@ pub const TryType4Tag = enum(u8) {
 
 /// Payload union for Try.
 pub const TryType4Payload = extern union {
-        err: RocStr,
-        ok: RocStr,
+    err: RocStr,
+    ok: RocStr,
 };
 
 /// Tag union: Try
@@ -661,8 +661,8 @@ pub const TryType6Tag = enum(u8) {
 
 /// Payload union for Try.
 pub const TryType6Payload = extern union {
-        err: RocStr,
-        ok: void,
+    err: RocStr,
+    ok: void,
 };
 
 /// Tag union: Try
@@ -702,8 +702,8 @@ pub const TryType11Tag = enum(u8) {
 
 /// Payload union for Try.
 pub const TryType11Payload = extern union {
-        err: i32,
-        ok: void,
+    err: i32,
+    ok: void,
 };
 
 /// Tag union: Try
@@ -757,7 +757,7 @@ pub const HostStdout_lineArgs = extern struct {
 pub fn decrefTryType0(value: TryType0, roc_host: *RocHost) void {
     switch (value.tag) {
         .Err => {
-        value.payload_err().decref(roc_host);
+            value.payload_err().decref(roc_host);
         },
         .Ok => {},
     }
@@ -767,7 +767,7 @@ pub fn decrefTryType0(value: TryType0, roc_host: *RocHost) void {
 pub fn increfTryType0(value: TryType0, amount: isize) void {
     switch (value.tag) {
         .Err => {
-        value.payload_err().incref(amount);
+            value.payload_err().incref(amount);
         },
         .Ok => {},
     }
@@ -777,10 +777,10 @@ pub fn increfTryType0(value: TryType0, amount: isize) void {
 pub fn decrefTryType4(value: TryType4, roc_host: *RocHost) void {
     switch (value.tag) {
         .Err => {
-        value.payload_err().decref(roc_host);
+            value.payload_err().decref(roc_host);
         },
         .Ok => {
-        value.payload_ok().decref(roc_host);
+            value.payload_ok().decref(roc_host);
         },
     }
 }
@@ -789,10 +789,10 @@ pub fn decrefTryType4(value: TryType4, roc_host: *RocHost) void {
 pub fn increfTryType4(value: TryType4, amount: isize) void {
     switch (value.tag) {
         .Err => {
-        value.payload_err().incref(amount);
+            value.payload_err().incref(amount);
         },
         .Ok => {
-        value.payload_ok().incref(amount);
+            value.payload_ok().incref(amount);
         },
     }
 }
@@ -801,7 +801,7 @@ pub fn increfTryType4(value: TryType4, amount: isize) void {
 pub fn decrefTryType6(value: TryType6, roc_host: *RocHost) void {
     switch (value.tag) {
         .Err => {
-        value.payload_err().decref(roc_host);
+            value.payload_err().decref(roc_host);
         },
         .Ok => {},
     }
@@ -811,7 +811,7 @@ pub fn decrefTryType6(value: TryType6, roc_host: *RocHost) void {
 pub fn increfTryType6(value: TryType6, amount: isize) void {
     switch (value.tag) {
         .Err => {
-        value.payload_err().incref(amount);
+            value.payload_err().incref(amount);
         },
         .Ok => {},
     }
@@ -835,7 +835,6 @@ pub fn increfTryType11(value: TryType11, amount: isize) void {
     }
 }
 
-
 // =============================================================================
 // Runtime Symbols
 //
@@ -858,6 +857,10 @@ pub extern fn roc_crashed(bytes: [*]const u8, len: usize) callconv(.c) void;
 
 /// Hosted symbol for Host.stderr_line!
 /// Roc signature: Str => Try({}, [StderrErr(Str)])
+pub extern fn roc_system_call(arg0: RocStr, arg1: RocStr) callconv(.c) TryType4;
+
+/// Hosted symbol for Host.stderr_line!
+/// Roc signature: Str => Try({}, [StderrErr(Str)])
 pub extern fn roc_stderr_line(arg0: RocStr) callconv(.c) TryType0;
 
 /// Hosted symbol for Host.stdin_line!
@@ -867,7 +870,6 @@ pub extern fn roc_stdin_line() callconv(.c) TryType4;
 /// Hosted symbol for Host.stdout_line!
 /// Roc signature: Str => Try({}, [StdoutErr(Str)])
 pub extern fn roc_stdout_line(arg0: RocStr) callconv(.c) TryType6;
-
 
 /// Default memory management functions for Roc platforms.
 ///

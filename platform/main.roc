@@ -4,6 +4,7 @@ platform ""
     packages {}
     provides { "roc_main": main_for_host! }
     hosted {
+        "roc_system_call": Host.system_call!,
         "roc_stderr_line": Host.stderr_line!,
         "roc_stdin_line": Host.stdin_line!,
         "roc_stdout_line": Host.stdout_line!,

@@ -21,6 +21,7 @@ extern fn roc_main(args: abi.RocList(abi.RocStr)) callconv(.c) i32;
 
 /// Private RocHost used by host helpers and exported runtime symbols.
 var g_roc_host: ?*abi.RocHost = null;
+var g_host_env: ?*HostEnv = null;
 
 // OS-specific entry point handling (not exported during tests)
 comptime {
@@ -82,6 +83,63 @@ fn stdoutLineErr(err: anyerror, roc_host: *abi.RocHost) abi.TryType6 {
     result.payload = .{ .err = abi.RocStr.fromSlice(@errorName(err), roc_host) };
     result.tag = .Err;
     return result;
+}
+
+fn systemCallOk(line: abi.RocStr) abi.TryType4 {
+    var result = std.mem.zeroes(abi.TryType4);
+    result.tag = .Ok;
+    result.payload = .{ .ok = line };
+    return result;
+}
+
+fn systemCallErr(err: anyerror, roc_host: *abi.RocHost) abi.TryType4 {
+    var result = std.mem.zeroes(abi.TryType4);
+    result.payload = .{ .err = abi.RocStr.fromSlice(@errorName(err), roc_host) };
+    result.tag = .Err;
+    return result;
+}
+
+/// Hosted function: Host.System_Call!
+fn hostedSystemCall(cmd: abi.RocStr, args: abi.RocStr) callconv(.c) abi.TryType4 {
+    const roc_host = g_roc_host.?;
+    var owned_cmd = cmd;
+    defer owned_cmd.decref(roc_host);
+    var owned_args = args;
+    defer owned_args.decref(roc_host);
+
+    const host_env = g_host_env.?;
+
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const gpa = host_env.roc_env.allocator;
+
+    const result = std.process.run(gpa, io, .{
+        .argv = &.{ owned_cmd.asSlice(), owned_args.asSlice() },
+    }) catch |err| {
+        return systemCallErr(err, roc_host);
+    };
+    defer gpa.free(result.stdout);
+    defer gpa.free(result.stderr);
+
+    // TODO: better error message for roc code
+    switch (result.term) {
+        .exited => |code| {
+            if (code != 0) {
+                std.log.err("{s} exited with code {d}: {s}", .{
+                    cmd.asSlice(),
+                    code,
+                    result.stderr,
+                });
+
+                return systemCallErr(error.NonZeroExit, roc_host);
+            }
+        },
+        else => {
+            std.log.err("{s} terminated unexpectedly: {any}", .{ cmd.asSlice(), result.term });
+            return systemCallErr(error.UnexpectedError, roc_host);
+        },
+    }
+
+    return stdinLineOk(abi.RocStr.fromSlice(result.stdout[0..result.stdout.len], roc_host));
 }
 
 /// Hosted function: Host.stderr_line!
@@ -173,6 +231,7 @@ fn hostCrashed(bytes: [*]const u8, len: usize) callconv(.c) void {
 
 comptime {
     if (!builtin.is_test) {
+        @export(&hostedSystemCall, .{ .name = "roc_system_call", .visibility = .hidden });
         @export(&hostedStderrLine, .{ .name = "roc_stderr_line", .visibility = .hidden });
         @export(&hostedStdinLine, .{ .name = "roc_stdin_line", .visibility = .hidden });
         @export(&hostedStdoutLine, .{ .name = "roc_stdout_line", .visibility = .hidden });
@@ -203,6 +262,7 @@ fn platform_main(argc: usize, argv: [*][*:0]u8) c_int {
 
     var roc_host = abi.makeRocHost(&host_env.roc_env);
     g_roc_host = &roc_host;
+    g_host_env = &host_env;
 
     // Build List(Str) from argc/argv
     std.log.debug("[HOST] Building args...", .{});
