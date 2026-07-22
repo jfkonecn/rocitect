@@ -19,6 +19,7 @@ platform ""
         arm64win: { inputs: ["host.lib", app] },
     }
 
+import SystemCall
 import Stdout
 import Stderr
 import Stdin
