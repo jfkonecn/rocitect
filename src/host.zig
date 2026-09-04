@@ -107,18 +107,18 @@ fn hostedSystemCall(cmd: abi.RocStr, args: abi.RocStr) callconv(.c) abi.TryType4
     var owned_args = args;
     defer owned_args.decref(roc_host);
 
-    const host_env = g_host_env.?;
+    const allocator = std.heap.page_allocator;
+    var threaded = std.Io.Threaded.init(allocator, .{});
+    defer threaded.deinit();
+    const io = threaded.io();
 
-    const io = std.Io.Threaded.global_single_threaded.io();
-    const gpa = host_env.roc_env.allocator;
-
-    const result = std.process.run(gpa, io, .{
+    const result = std.process.run(allocator, io, .{
         .argv = &.{ owned_cmd.asSlice(), owned_args.asSlice() },
     }) catch |err| {
         return systemCallErr(err, roc_host);
     };
-    defer gpa.free(result.stdout);
-    defer gpa.free(result.stderr);
+    defer allocator.free(result.stdout);
+    defer allocator.free(result.stderr);
 
     // TODO: better error message for roc code
     switch (result.term) {
