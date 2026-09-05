@@ -227,16 +227,22 @@ fn buildHostLib(
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
 ) *std.Build.Step.Compile {
+    const httpz = b.dependency("httpz", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    const host_module = b.createModule(.{
+        .root_source_file = b.path("src/host.zig"),
+        .target = target,
+        .optimize = optimize,
+        .strip = optimize != .Debug,
+        .pic = true,
+    });
+    host_module.addImport("httpz", httpz.module("httpz"));
     const host_lib = b.addLibrary(.{
         .name = "host",
         .linkage = .static,
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/host.zig"),
-            .target = target,
-            .optimize = optimize,
-            .strip = optimize != .Debug,
-            .pic = true,
-        }),
+        .root_module = host_module,
     });
     // Force bundle compiler-rt to resolve runtime symbols like __main
     host_lib.bundle_compiler_rt = true;

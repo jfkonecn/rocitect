@@ -1,0 +1,25 @@
+{
+  "name": "rocitect",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jfkonecn/rocitect.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/jfkonecn/rocitect/issues"
+  },
+  "homepage": "https://github.com/jfkonecn/rocitect#readme",
+  "devDependencies": {
+    "@biomejs/biome": "2.5.12",
+    "esbuild": "0.28.2"
+  }
+}
