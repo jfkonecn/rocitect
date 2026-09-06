@@ -1,16 +1,10 @@
 platform ""
 	requires {
-		main! : List(Str) => Try({}, [Exit(I32), ..])
+		plan_page! : {} => Str
 	}
-	exposes [Stdout, Stderr, Stdin, SystemCall]
+	exposes []
 	packages {}
-	provides { "roc_main": main_for_host! }
-	hosted {
-		"roc_system_call": Host.system_call!,
-		"roc_stderr_line": Host.stderr_line!,
-		"roc_stdin_line": Host.stdin_line!,
-		"roc_stdout_line": Host.stdout_line!,
-	}
+	provides { "roc_plan_page": plan_page_for_host! }
 	targets: {
 		inputs_dir: "targets/",
 		x64mac: { inputs: ["libhost.a", app] },
@@ -20,22 +14,5 @@ platform ""
 		x64win: { inputs: ["host.lib", app] },
 		arm64win: { inputs: ["host.lib", app] },
 	}
-
-import SystemCall
-import Stdout
-import Stderr
-import Stdin
-import Host
-
-main_for_host! : List(Str) => I32
-main_for_host! = |args| {
-	result = main!(args)
-	match result {
-		Ok({}) => 0
-		Err(Exit(code)) => code
-		Err(other) => {
-			_ = Stderr.line!("ERROR: ${Str.inspect(other)}")
-			-1
-		}
-	}
-}
+plan_page_for_host! : {} => Str
+plan_page_for_host! = |_| plan_page!({})

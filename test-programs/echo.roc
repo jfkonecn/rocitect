@@ -1,16 +1,4 @@
-app [main!] { pf: platform "../platform/main.roc" }
+app [plan_page!] { pf: platform "../platform/main.roc" }
 
-import pf.Stdin
-import pf.Stdout
-
-# Demonstrates: Stdin.line!, interactive I/O, effectful functions
-
-main! : List(Str) => Try({}, [Exit(I32), StdinErr(Str), StdoutErr(Str), ..])
-main! = |_args| {
-    Stdout.line!("Enter something and I'll echo it back:")?
-
-    input = Stdin.line!({})?
-    Stdout.line!("You entered: ${input}")?
-
-    Ok({})
-}
+plan_page! : {} => Str
+plan_page! = |_| "<html><body><h1>Hello from Roc</h1></body></html>"

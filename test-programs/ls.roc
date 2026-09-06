@@ -1,11 +1,4 @@
-app [main!] { pf: platform "../platform/main.roc" }
+app [plan_page!] { pf: platform "../platform/main.roc" }
 
-import pf.SystemCall
-import pf.Stdout
-
-main! : List(Str) => Try({}, [Exit(I32), StdinErr(Str), StdoutErr(Str), ..])
-main! = |_args| {
-	output = SystemCall.line!("ls", "-a")?
-	Stdout.line!(output)?
-	Ok({})
-}
+plan_page! : {} => Str
+plan_page! = |_| "<html><body><h1>Roc page</h1></body></html>"

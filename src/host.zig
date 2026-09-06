@@ -1,27 +1,15 @@
-///! Platform host that implements effectful functions for stdout, stderr, and stdin.
+///! Platform host that serves HTML returned by the Roc application.
 const std = @import("std");
 const builtin = @import("builtin");
+const httpz = @import("httpz");
 const abi = @import("roc_platform_abi.zig");
 
 pub const std_options: std.Options = .{
     .allow_stack_tracing = false,
 };
 
-/// Host environment. Embeds `abi.RocEnv` so the Roc runtime sees a pointer
-/// to a standard `RocEnv` while hosted functions can recover the full
-/// `HostEnv` via `@fieldParentPtr`.
-const HostEnv = struct {
-    gpa: std.heap.DebugAllocator(.{}),
-    stdin_reader: std.Io.File.Reader,
-    roc_env: abi.RocEnv,
-};
-
-/// Roc entrypoint exported by the app under `provides { "roc_main": main_for_host! }`.
-extern fn roc_main(args: abi.RocList(abi.RocStr)) callconv(.c) i32;
-
-/// Private RocHost used by host helpers and exported runtime symbols.
+/// Private RocHost used by exported runtime symbols and the page handler.
 var g_roc_host: ?*abi.RocHost = null;
-var g_host_env: ?*HostEnv = null;
 
 // OS-specific entry point handling (not exported during tests)
 comptime {
@@ -45,164 +33,32 @@ fn main(argc: c_int, argv: [*][*:0]u8) callconv(.c) c_int {
     return platform_main(@intCast(argc), argv);
 }
 
-fn stderrLineOk() abi.TryType0 {
-    var result = std.mem.zeroes(abi.TryType0);
-    result.tag = .Ok;
-    return result;
-}
+extern fn getauxval(kind: usize) usize;
 
-fn stderrLineErr(err: anyerror, roc_host: *abi.RocHost) abi.TryType0 {
-    var result = std.mem.zeroes(abi.TryType0);
-    result.payload = .{ .err = abi.RocStr.fromSlice(@errorName(err), roc_host) };
-    result.tag = .Err;
-    return result;
-}
-
-fn stdinLineOk(line: abi.RocStr) abi.TryType4 {
-    var result = std.mem.zeroes(abi.TryType4);
-    result.payload = .{ .ok = line };
-    result.tag = .Ok;
-    return result;
-}
-
-fn stdinLineErr(err: anyerror, roc_host: *abi.RocHost) abi.TryType4 {
-    var result = std.mem.zeroes(abi.TryType4);
-    result.payload = .{ .err = abi.RocStr.fromSlice(@errorName(err), roc_host) };
-    result.tag = .Err;
-    return result;
-}
-
-fn stdoutLineOk() abi.TryType6 {
-    var result = std.mem.zeroes(abi.TryType6);
-    result.tag = .Ok;
-    return result;
-}
-
-fn stdoutLineErr(err: anyerror, roc_host: *abi.RocHost) abi.TryType6 {
-    var result = std.mem.zeroes(abi.TryType6);
-    result.payload = .{ .err = abi.RocStr.fromSlice(@errorName(err), roc_host) };
-    result.tag = .Err;
-    return result;
-}
-
-fn systemCallOk(line: abi.RocStr) abi.TryType4 {
-    var result = std.mem.zeroes(abi.TryType4);
-    result.tag = .Ok;
-    result.payload = .{ .ok = line };
-    return result;
-}
-
-fn systemCallErr(err: anyerror, roc_host: *abi.RocHost) abi.TryType4 {
-    var result = std.mem.zeroes(abi.TryType4);
-    result.payload = .{ .err = abi.RocStr.fromSlice(@errorName(err), roc_host) };
-    result.tag = .Err;
-    return result;
-}
-
-/// Hosted function: Host.System_Call!
-fn hostedSystemCall(cmd: abi.RocStr, args: abi.RocStr) callconv(.c) abi.TryType4 {
-    const roc_host = g_roc_host.?;
-    var owned_cmd = cmd;
-    defer owned_cmd.decref(roc_host);
-    var owned_args = args;
-    defer owned_args.decref(roc_host);
-
-    const allocator = std.heap.page_allocator;
-    var threaded = std.Io.Threaded.init(allocator, .{});
-    defer threaded.deinit();
-    const io = threaded.io();
-
-    const result = std.process.run(allocator, io, .{
-        .argv = &.{ owned_cmd.asSlice(), owned_args.asSlice() },
-    }) catch |err| {
-        return systemCallErr(err, roc_host);
-    };
-    defer allocator.free(result.stdout);
-    defer allocator.free(result.stderr);
-
-    // TODO: better error message for roc code
-    switch (result.term) {
-        .exited => |code| {
-            if (code != 0) {
-                std.log.err("{s} exited with code {d}: {s}", .{
-                    cmd.asSlice(),
-                    code,
-                    result.stderr,
-                });
-
-                return systemCallErr(error.NonZeroExit, roc_host);
-            }
-        },
-        else => {
-            std.log.err("{s} terminated unexpectedly: {any}", .{ cmd.asSlice(), result.term });
-            return systemCallErr(error.UnexpectedError, roc_host);
-        },
+// Roc's musl CRT starts this executable instead of Zig's normal entrypoint.
+// Initialize Zig's TLS metadata from the ELF program headers before httpz
+// creates worker threads; otherwise std.Thread.spawn sees uninitialized TLS.
+// TLS (thread-local storage) gives every thread its own runtime state. ELF is
+// the Linux executable format; its program headers describe the TLS layout.
+fn initZigTls() void {
+    // TLS setup is required only on Linux, where this platform uses musl.
+    if (comptime builtin.os.tag == .linux) {
+        // AT_PHDR points to the executable's ELF program-header table.
+        const phdrs: [*]std.elf.Phdr = @ptrFromInt(getauxval(std.elf.AT_PHDR));
+        // AT_PHNUM gives the number of entries in that table.
+        const phdr_count = getauxval(std.elf.AT_PHNUM);
+        // Zig reads the PT_TLS header to initialize its thread-local storage.
+        std.os.linux.tls.initStatic(phdrs[0..phdr_count]);
     }
-
-    return stdinLineOk(abi.RocStr.fromSlice(result.stdout[0..result.stdout.len], roc_host));
 }
 
-/// Hosted function: Host.stderr_line!
-fn hostedStderrLine(str: abi.RocStr) callconv(.c) abi.TryType0 {
+fn planPage(_: *httpz.Request, res: *httpz.Response) !void {
     const roc_host = g_roc_host.?;
-    var owned = str;
-    defer owned.decref(roc_host);
+    var html = abi.roc_plan_page();
+    defer html.decref(roc_host);
 
-    const message = owned.asSlice();
-    const io = std.Io.Threaded.global_single_threaded.io();
-    const stderr = std.Io.File.stderr();
-    stderr.writeStreamingAll(io, message) catch |err| return stderrLineErr(err, roc_host);
-    stderr.writeStreamingAll(io, "\n") catch |err| return stderrLineErr(err, roc_host);
-    return stderrLineOk();
-}
-
-/// Hosted function: Host.stdin_line!
-fn hostedStdinLine() callconv(.c) abi.TryType4 {
-    const roc_host = g_roc_host.?;
-    const roc_env: *abi.RocEnv = @ptrCast(@alignCast(roc_host.env));
-    const host: *HostEnv = @fieldParentPtr("roc_env", roc_env);
-    var reader = &host.stdin_reader.interface;
-
-    var line = while (true) {
-        const maybe_line = reader.takeDelimiter('\n') catch |err| switch (err) {
-            error.ReadFailed => return stdinLineErr(err, roc_host),
-            error.StreamTooLong => {
-                // Skip the overlong line so the next call starts fresh.
-                _ = reader.discardDelimiterInclusive('\n') catch |discard_err| switch (discard_err) {
-                    error.ReadFailed => return stdinLineErr(discard_err, roc_host),
-                    error.EndOfStream => return stdinLineOk(abi.RocStr.empty()),
-                };
-                continue;
-            },
-        } orelse break &.{};
-
-        break maybe_line;
-    };
-
-    // Trim trailing \r for Windows line endings
-    if (line.len > 0 and line[line.len - 1] == '\r') {
-        line = line[0 .. line.len - 1];
-    }
-
-    if (line.len == 0) {
-        return stdinLineOk(abi.RocStr.empty());
-    }
-
-    return stdinLineOk(abi.RocStr.fromSlice(line[0..line.len], roc_host));
-}
-
-/// Hosted function: Host.stdout_line!
-fn hostedStdoutLine(str: abi.RocStr) callconv(.c) abi.TryType6 {
-    const roc_host = g_roc_host.?;
-    var owned = str;
-    defer owned.decref(roc_host);
-
-    const message = owned.asSlice();
-    const io = std.Io.Threaded.global_single_threaded.io();
-    const stdout = std.Io.File.stdout();
-    stdout.writeStreamingAll(io, message) catch |err| return stdoutLineErr(err, roc_host);
-    stdout.writeStreamingAll(io, "\n") catch |err| return stdoutLineErr(err, roc_host);
-    return stdoutLineOk();
+    res.body = try res.arena.dupe(u8, html.asSlice());
+    res.content_type = .HTML;
 }
 
 fn hostAlloc(length: usize, alignment: usize) callconv(.c) ?*anyopaque {
@@ -231,11 +87,6 @@ fn hostCrashed(bytes: [*]const u8, len: usize) callconv(.c) void {
 
 comptime {
     if (!builtin.is_test) {
-        @export(&hostedSystemCall, .{ .name = "roc_system_call", .visibility = .hidden });
-        @export(&hostedStderrLine, .{ .name = "roc_stderr_line", .visibility = .hidden });
-        @export(&hostedStdinLine, .{ .name = "roc_stdin_line", .visibility = .hidden });
-        @export(&hostedStdoutLine, .{ .name = "roc_stdout_line", .visibility = .hidden });
-
         @export(&hostAlloc, .{ .name = "roc_alloc", .visibility = .hidden });
         @export(&hostDealloc, .{ .name = "roc_dealloc", .visibility = .hidden });
         @export(&hostRealloc, .{ .name = "roc_realloc", .visibility = .hidden });
@@ -248,58 +99,40 @@ comptime {
 /// Platform host entrypoint
 fn platform_main(argc: usize, argv: [*][*:0]u8) c_int {
     const io = std.Io.Threaded.global_single_threaded.io();
-    var stdin_buffer: [4096]u8 = undefined;
+    _ = argc;
+    _ = argv;
 
-    var host_env = HostEnv{
-        .gpa = std.heap.DebugAllocator(.{}){},
-        .stdin_reader = std.Io.File.stdin().readerStreaming(io, &stdin_buffer),
-        .roc_env = undefined,
-    };
-    host_env.roc_env = .{
-        .allocator = host_env.gpa.allocator(),
+    initZigTls();
+
+    var gpa = std.heap.DebugAllocator(.{}){};
+    var roc_env = abi.RocEnv{
+        .allocator = gpa.allocator(),
         .roc_io = abi.RocIo.default(),
     };
 
-    var roc_host = abi.makeRocHost(&host_env.roc_env);
+    var roc_host = abi.makeRocHost(&roc_env);
     g_roc_host = &roc_host;
-    g_host_env = &host_env;
 
-    // Build List(Str) from argc/argv
-    std.log.debug("[HOST] Building args...", .{});
-    const args_list = buildStrArgsList(argc, argv, &roc_host);
-    std.log.debug("[HOST] args_list ptr=0x{x} len={d}", .{ @intFromPtr(args_list.elements_ptr), args_list.length });
+    var server = httpz.Server(void).init(io, gpa.allocator(), .{
+        .address = .localhost(8080),
+    }, {}) catch |err| {
+        std.log.err("failed to start HTTP server: {s}", .{@errorName(err)});
+        return 1;
+    };
+    defer server.deinit();
+    defer server.stop();
 
-    // Call the app's main! entrypoint - returns I32 exit code
-    std.log.debug("[HOST] Calling roc_main...", .{});
+    var router = server.router(.{}) catch |err| {
+        std.log.err("failed to create HTTP router: {s}", .{@errorName(err)});
+        return 1;
+    };
+    router.get("/", planPage, .{});
 
-    const exit_code = roc_main(args_list);
-    std.log.debug("[HOST] Returned from roc, exit_code={d}", .{exit_code});
+    std.log.info("serving http://localhost:8080/", .{});
+    server.listen() catch |err| {
+        std.log.err("HTTP server stopped: {s}", .{@errorName(err)});
+        return 1;
+    };
 
-    // Check for memory leaks before returning
-    const leak_status = host_env.gpa.deinit();
-    if (leak_status == .leak) {
-        std.log.err("\x1b[33mMemory leak detected!\x1b[0m", .{});
-        std.process.exit(1);
-    }
-
-    return exit_code;
-}
-
-/// Build a RocList of RocStr from argc/argv
-fn buildStrArgsList(argc: usize, argv: [*][*:0]u8, roc_host: *abi.RocHost) abi.RocList(abi.RocStr) {
-    if (argc == 0) {
-        return abi.RocList(abi.RocStr).empty();
-    }
-
-    const args_list = abi.RocList(abi.RocStr).allocate(argc, roc_host);
-    const args_ptr: [*]abi.RocStr = args_list.elements_ptr.?;
-
-    // Build each argument string
-    for (0..argc) |i| {
-        const arg_cstr = argv[i];
-        const arg_len = std.mem.len(arg_cstr);
-        args_ptr[i] = abi.RocStr.fromSlice(arg_cstr[0..arg_len], roc_host);
-    }
-
-    return args_list;
+    return 0;
 }

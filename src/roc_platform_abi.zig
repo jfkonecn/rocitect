@@ -848,29 +848,6 @@ pub extern fn roc_dbg(bytes: [*]const u8, len: usize) callconv(.c) void;
 pub extern fn roc_expect_failed(bytes: [*]const u8, len: usize) callconv(.c) void;
 pub extern fn roc_crashed(bytes: [*]const u8, len: usize) callconv(.c) void;
 
-// =============================================================================
-// Hosted Symbols
-//
-// The platform host must export these symbols with the exact direct C ABI signatures.
-// Refcounted arguments are owned by the hosted function.
-// =============================================================================
-
-/// Hosted symbol for Host.stderr_line!
-/// Roc signature: Str => Try({}, [StderrErr(Str)])
-pub extern fn roc_system_call(arg0: RocStr, arg1: RocStr) callconv(.c) TryType4;
-
-/// Hosted symbol for Host.stderr_line!
-/// Roc signature: Str => Try({}, [StderrErr(Str)])
-pub extern fn roc_stderr_line(arg0: RocStr) callconv(.c) TryType0;
-
-/// Hosted symbol for Host.stdin_line!
-/// Roc signature: {} => Try(Str, [StdinErr(Str)])
-pub extern fn roc_stdin_line() callconv(.c) TryType4;
-
-/// Hosted symbol for Host.stdout_line!
-/// Roc signature: Str => Try({}, [StdoutErr(Str)])
-pub extern fn roc_stdout_line(arg0: RocStr) callconv(.c) TryType6;
-
 /// Default memory management functions for Roc platforms.
 ///
 /// Uses `RocEnv.allocator` for allocation. Each allocation prepends
@@ -1012,5 +989,5 @@ pub fn makeRocHost(env: *RocEnv) RocHost {
 // Roc exports these symbols from the app with their natural C ABI signatures.
 // =============================================================================
 
-/// Entrypoint: main_for_host!
-pub extern fn roc_main(arg0: RocList(RocStr)) callconv(.c) i32;
+/// Entrypoint: plan_page_for_host!
+pub extern fn roc_plan_page() callconv(.c) RocStr;

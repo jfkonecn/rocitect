@@ -231,14 +231,22 @@ fn buildHostLib(
         .target = target,
         .optimize = optimize,
     });
+    const httpz_module = httpz.module("httpz");
+    httpz_module.link_libc = false;
+    const websocket = httpz.builder.dependency("websocket", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    websocket.module("websocket").link_libc = false;
     const host_module = b.createModule(.{
         .root_source_file = b.path("src/host.zig"),
         .target = target,
         .optimize = optimize,
+        .link_libc = false,
         .strip = optimize != .Debug,
         .pic = true,
     });
-    host_module.addImport("httpz", httpz.module("httpz"));
+    host_module.addImport("httpz", httpz_module);
     const host_lib = b.addLibrary(.{
         .name = "host",
         .linkage = .static,
