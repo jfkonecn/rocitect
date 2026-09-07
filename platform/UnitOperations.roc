@@ -18,9 +18,7 @@ TypeDefinition := [
 		{
 			id : [Str, None],
 			typeName : Str,
-			filePath : [Str, None],
-			packageNamespace : Str,
-			codeComments : Str,
+			codeComments : CodeComments,
 			fields : List(StructTypeField),
 		},
 	),
@@ -28,7 +26,7 @@ TypeDefinition := [
 
 StructTypeField := {
 	name : Str,
-	codeComment : Str,
+	codeComments : CodeComments,
 	typeDefinition : [NoType, Type(TypeDefinition)],
 }
 
@@ -40,7 +38,7 @@ VariableDefinition := {
 DistributionCondition := {
 	condition : Str,
 	output : [NoVariable, Variable(VariableDefinition)],
-	codeComments : Str,
+	codeComments : CodeComments,
 	functionCalls : List([NoFunction, Function(FunctionDefinition)]),
 }
 
@@ -51,7 +49,7 @@ UnitOperation := [
 			input : [NoVariable, Variable(VariableDefinition)],
 			output : [NoVariable, Variable(VariableDefinition)],
 			functionCalls : List([NoFunction, Function(FunctionDefinition)]),
-			codeComments : Str,
+			codeComments : CodeComments,
 		},
 	),
 	# A Filter unit operation removes, rejects, or reroutes data.
@@ -69,14 +67,14 @@ UnitOperation := [
 			input : [NoVariable, Variable(VariableDefinition)],
 			functionCalls : List([NoFunction, Function(FunctionDefinition)]),
 			sortLogic : Str,
-			codeComments : Str,
+			codeComments : CodeComments,
 		},
 	),
 	# A Distribution unit operation chooses where data goes next, such as branching.
 	Distribution(
 		{
 			input : [NoVariable, Variable(VariableDefinition)],
-			codeComments : Str,
+			codeComments : CodeComments,
 			conditions : List(DistributionCondition),
 		},
 	),
@@ -86,7 +84,7 @@ UnitOperation := [
 			input : [NoVariable, Variable(VariableDefinition)],
 			successOutput : [NoVariable, Variable(VariableDefinition)],
 			failureOutput : [NoVariable, Variable(VariableDefinition)],
-			codeComments : Str,
+			codeComments : CodeComments,
 			functionCalls : List([NoFunction, Function(FunctionDefinition)]),
 		},
 	),
@@ -96,7 +94,7 @@ UnitOperation := [
 			input : [NoVariable, Variable(VariableDefinition)],
 			successOutput : [NoVariable, Variable(VariableDefinition)],
 			failureOutput : [NoVariable, Variable(VariableDefinition)],
-			codeComments : Str,
+			codeComments : CodeComments,
 			functionCalls : List([NoFunction, Function(FunctionDefinition)]),
 		},
 	),
@@ -115,7 +113,7 @@ UnitOperation := [
 	GlobalStateRead(
 		{
 			output : [NoVariable, Variable(VariableDefinition)],
-			codeComments : Str,
+			codeComments : CodeComments,
 			functionCalls : List([NoFunction, Function(FunctionDefinition)]),
 		},
 	),
@@ -149,8 +147,7 @@ UnitOperation := [
 FunctionDefinition := {
 	id : [Unspecified, Specified(Str)],
 	functionName : Str,
-	filePath : Str,
-	codeComments : [Uncommented, Comments(Str)],
+	codeComments : CodeComments,
 	unitOperations : List([NoOperation, Operation(UnitOperation)]),
 }
 
@@ -162,7 +159,6 @@ TestCase := {
 TestSuite := {
 	id : [Unspecified, Specified(Str)],
 	name : Str,
-	filePath : Str,
 	functionDefinition : [NoFunction, Function(FunctionDefinition)],
 	testCases : List([NoTestCase, TestCase(TestCase)]),
 }
