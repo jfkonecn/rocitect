@@ -1,9 +1,10 @@
 const { build } = require("esbuild");
-const { mkdir, readdir, rm, writeFile } = require("node:fs/promises");
+const { copyFile, mkdir, readdir, rm, writeFile } = require("node:fs/promises");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
 const sourceDirectory = path.join(root, "ts");
+const vendorJsDirectory = path.join(root, "vendor", "js");
 const outputDirectory = path.join(root, "dist");
 const development = process.argv.includes("--dev");
 
@@ -29,6 +30,31 @@ async function findEntries(directory) {
 function entryName(entry) {
 	const folder = path.dirname(path.relative(sourceDirectory, entry));
 	return folder === "" ? "index" : folder.split(path.sep).join("-");
+}
+
+async function copyVendorJavaScript(manifest) {
+	let files;
+	try {
+		files = await readdir(vendorJsDirectory, { withFileTypes: true });
+	} catch (error) {
+		if (error.code === "ENOENT") return;
+		throw error;
+	}
+
+	for (const file of files) {
+		if (!file.isFile()) continue;
+		if (!file.name.endsWith(".js") && !file.name.endsWith(".js.map")) continue;
+
+		await copyFile(
+			path.join(vendorJsDirectory, file.name),
+			path.join(outputDirectory, file.name),
+		);
+
+		if (file.name.endsWith(".js")) {
+			const name = `vendor-${path.basename(file.name, ".js")}`;
+			manifest[name] = `/assets/${file.name}`;
+		}
+	}
 }
 
 async function main() {
@@ -74,6 +100,7 @@ async function main() {
 			manifest[name] = `/assets/${filename.split(path.sep).join("/")}`;
 		}
 	}
+	await copyVendorJavaScript(manifest);
 
 	const sortedManifest = Object.fromEntries(
 		Object.entries(manifest).sort(([left], [right]) =>
