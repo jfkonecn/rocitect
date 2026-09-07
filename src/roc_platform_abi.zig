@@ -991,3 +991,18 @@ pub fn makeRocHost(env: *RocEnv) RocHost {
 
 /// Entrypoint: plan_page_for_host!
 pub extern fn roc_plan_page() callconv(.c) RocStr;
+
+/// Entrypoint: mcp_resources_for_host!
+pub extern fn roc_mcp_resources() callconv(.c) RocStr;
+
+/// Entrypoint: mcp_read_resource_for_host!
+pub extern fn roc_mcp_read_resource(arg0: RocStr) callconv(.c) RocStr;
+
+/// Entrypoint: mcp_prompts_for_host!
+pub extern fn roc_mcp_prompts() callconv(.c) RocStr;
+
+/// Entrypoint: mcp_prompt_for_host!
+pub extern fn roc_mcp_prompt(arg0: RocStr) callconv(.c) RocStr;
+
+/// Entrypoint: mcp_implementation_targets_for_host!
+pub extern fn roc_mcp_implementation_targets() callconv(.c) RocStr;

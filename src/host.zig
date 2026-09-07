@@ -123,6 +123,165 @@ fn assetFile(req: *httpz.Request, res: *httpz.Response) !void {
     );
 }
 
+fn mcpEndpoint(req: *httpz.Request, res: *httpz.Response) !void {
+    if (req.method != .POST) {
+        res.content_type = .JSON;
+        res.header("Cache-Control", "no-cache");
+        try res.writer().writeAll(
+            "{\"name\":\"rocitect\",\"endpoint\":\"/mcp\",\"transport\":\"streamable-http\"}",
+        );
+        return;
+    }
+
+    var body: std.Io.Writer.Allocating = .init(res.arena);
+    var reader = try req.reader(1024 * 1024);
+    var buffer: [8192]u8 = undefined;
+    while (true) {
+        const read = try reader.read(&buffer);
+        if (read == 0) break;
+        try body.writer.writeAll(buffer[0..read]);
+    }
+
+    var parsed = std.json.parseFromSlice(std.json.Value, res.arena, body.written(), .{}) catch {
+        res.setStatus(.bad_request);
+        res.content_type = .JSON;
+        try res.writer().writeAll("{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32700,\"message\":\"Parse error\"}}");
+        return;
+    };
+    defer parsed.deinit();
+
+    if (parsed.value != .object) {
+        return writeJsonRpcError(res, .null, -32600, "Invalid request");
+    }
+
+    const request = parsed.value.object;
+    const id: std.json.Value = request.get("id") orelse .null;
+    const method_value = request.get("method") orelse return writeJsonRpcError(res, id, -32600, "Missing method");
+    if (method_value != .string) return writeJsonRpcError(res, id, -32600, "Invalid method");
+
+    res.content_type = .JSON;
+    res.header("Cache-Control", "no-cache");
+
+    const method = method_value.string;
+    if (std.mem.eql(u8, method, "initialize")) {
+        try writeJsonRpcResultPrefix(res.writer(), id);
+        try res.writer().writeAll("{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{\"resources\":{},\"prompts\":{},\"tools\":{}},\"serverInfo\":{\"name\":\"rocitect\",\"version\":\"0.1.0\"}}");
+        return writeJsonRpcResultSuffix(res.writer());
+    } else if (std.mem.eql(u8, method, "resources/list")) {
+        var resources = abi.roc_mcp_resources();
+        defer resources.decref(g_roc_host.?);
+        try writeJsonRpcResultPrefix(res.writer(), id);
+        try res.writer().print("{{\"resources\":{s}}}", .{resources.asSlice()});
+        return writeJsonRpcResultSuffix(res.writer());
+    } else if (std.mem.eql(u8, method, "resources/read")) {
+        const uri = getStringParam(request.get("params"), "uri") orelse "unknown";
+        const resource_key = resourceKey(uri);
+        const roc_key = abi.RocStr.fromSlice(resource_key, g_roc_host.?);
+        var content = abi.roc_mcp_read_resource(roc_key);
+        defer content.decref(g_roc_host.?);
+        try writeJsonRpcResultPrefix(res.writer(), id);
+        try res.writer().writeAll("{\"contents\":[{\"uri\":");
+        try writeJsonString(res.writer(), uri);
+        try res.writer().writeAll(",\"mimeType\":\"text/plain\",\"text\":");
+        try writeJsonString(res.writer(), content.asSlice());
+        try res.writer().writeAll("}]}");
+        return writeJsonRpcResultSuffix(res.writer());
+    } else if (std.mem.eql(u8, method, "prompts/list")) {
+        var prompts = abi.roc_mcp_prompts();
+        defer prompts.decref(g_roc_host.?);
+        try writeJsonRpcResultPrefix(res.writer(), id);
+        try res.writer().print("{{\"prompts\":{s}}}", .{prompts.asSlice()});
+        return writeJsonRpcResultSuffix(res.writer());
+    } else if (std.mem.eql(u8, method, "prompts/get")) {
+        const name = getStringParam(request.get("params"), "name") orelse "implement-function";
+        const prompt_name = if (std.mem.eql(u8, name, "implement-test-suite")) "implement-test-suite" else "implement-function";
+        const roc_name = abi.RocStr.fromSlice(prompt_name, g_roc_host.?);
+        var prompt = abi.roc_mcp_prompt(roc_name);
+        defer prompt.decref(g_roc_host.?);
+        try writeJsonRpcResultPrefix(res.writer(), id);
+        try res.writer().writeAll("{\"description\":");
+        try writeJsonString(res.writer(), prompt_name);
+        try res.writer().writeAll(",\"messages\":[{\"role\":\"user\",\"content\":{\"type\":\"text\",\"text\":");
+        try writeJsonString(res.writer(), prompt.asSlice());
+        try res.writer().writeAll("}}]}");
+        return writeJsonRpcResultSuffix(res.writer());
+    } else if (std.mem.eql(u8, method, "tools/list")) {
+        // TODO: Tell the LLM to record its progress as it makes changes.
+        // TODO: Reuse this data model so the website can save the same function, test suite, prompt, and reference data if needed.
+        // TODO: Add Roc code to generate website pages based on the defined functions.
+        try writeJsonRpcResultPrefix(res.writer(), id);
+        try res.writer().writeAll("{\"tools\":[{\"name\":\"list_implementation_targets\",\"description\":\"List available functions and test suites to implement.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{}}}]}");
+        return writeJsonRpcResultSuffix(res.writer());
+    } else if (std.mem.eql(u8, method, "tools/call")) {
+        const name = getStringParam(request.get("params"), "name") orelse "";
+        if (!std.mem.eql(u8, name, "list_implementation_targets")) {
+            return writeJsonRpcError(res, id, -32602, "Unknown tool");
+        }
+        var targets = abi.roc_mcp_implementation_targets();
+        defer targets.decref(g_roc_host.?);
+        try writeJsonRpcResultPrefix(res.writer(), id);
+        try res.writer().writeAll("{\"content\":[{\"type\":\"text\",\"text\":");
+        try writeJsonString(res.writer(), targets.asSlice());
+        try res.writer().writeAll("}]}");
+        return writeJsonRpcResultSuffix(res.writer());
+    }
+
+    return writeJsonRpcError(res, id, -32601, "Method not found");
+}
+
+fn getStringParam(params: ?std.json.Value, name: []const u8) ?[]const u8 {
+    const params_value = params orelse return null;
+    if (params_value != .object) return null;
+    const value = params_value.object.get(name) orelse return null;
+    if (value != .string) return null;
+    return value.string;
+}
+
+fn resourceKey(uri: []const u8) []const u8 {
+    if (std.mem.eql(u8, uri, "rocitect://references/implementation-guidance")) return "implementation-guidance";
+    if (std.mem.eql(u8, uri, "rocitect://references/progress-tracking")) return "progress-tracking";
+    return "unknown";
+}
+
+fn writeJsonRpcError(res: *httpz.Response, id: std.json.Value, code: i32, message: []const u8) !void {
+    res.content_type = .JSON;
+    res.header("Cache-Control", "no-cache");
+    const writer = res.writer();
+    try writer.writeAll("{\"jsonrpc\":\"2.0\",\"id\":");
+    try std.json.stringify(id, .{}, writer);
+    try writer.print(",\"error\":{{\"code\":{},\"message\":", .{code});
+    try writeJsonString(writer, message);
+    try writer.writeAll("}}");
+}
+
+fn writeJsonRpcResultPrefix(writer: anytype, id: std.json.Value) !void {
+    try writer.writeAll("{\"jsonrpc\":\"2.0\",\"id\":");
+    try std.json.stringify(id, .{}, writer);
+    try writer.writeAll(",\"result\":");
+}
+
+fn writeJsonRpcResultSuffix(writer: anytype) !void {
+    try writer.writeAll("}");
+}
+
+fn writeJsonString(writer: anytype, value: []const u8) !void {
+    try writer.writeAll("\"");
+    for (value) |byte| {
+        switch (byte) {
+            '"' => try writer.writeAll("\\\""),
+            '\\' => try writer.writeAll("\\\\"),
+            '\n' => try writer.writeAll("\\n"),
+            '\r' => try writer.writeAll("\\r"),
+            '\t' => try writer.writeAll("\\t"),
+            0x08 => try writer.writeAll("\\b"),
+            0x0c => try writer.writeAll("\\f"),
+            0...0x07, 0x0b, 0x0e...0x1f => try writer.print("\\u{x:0>4}", .{byte}),
+            else => try writer.writeAll(&.{byte}),
+        }
+    }
+    try writer.writeAll("\"");
+}
+
 fn loadAssetManifest(io: std.Io, allocator: std.mem.Allocator) !AssetManifest {
     const manifest_buffer = try allocator.alloc(u8, 1024 * 1024);
     defer allocator.free(manifest_buffer);
@@ -244,6 +403,8 @@ fn platform_main(argc: usize, argv: [*][*:0]u8) c_int {
         return 1;
     };
     router.get("/", planPage, .{});
+    router.get("/mcp", mcpEndpoint, .{});
+    router.post("/mcp", mcpEndpoint, .{});
     router.get("/assets/*", assetFile, .{});
 
     std.log.info("serving http://localhost:8080/", .{});
