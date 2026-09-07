@@ -1,0 +1,15 @@
+/* https://css-tricks.com/css-cascade-layers/
+ * 1. Reset - Low level reset and normalization styles
+ * 2. Themes - themes, like light and dark modes
+ * 3. Default - element defaults, for basic typography and legibility
+ * 4. Patterns - re-usable patterns that might appear across multiple components
+ * 5. Layouts - layouts and larger page structures
+ * 6. Components - individual components
+ * 7. Utilities - overrides and utilities
+ */
+@layer reset, themes, default, patterns, layouts, components, utilities;
+@import "./reset.css";
+@import "./themes.css";
+@import "./default.css";
+@import "./layouts.css";
+@import "./components.css";

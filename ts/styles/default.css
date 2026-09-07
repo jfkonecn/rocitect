@@ -1,0 +1,502 @@
+@layer default {
+	:root {
+		--radius--2: 0.125rem;
+		--radius--1: 0.25rem;
+		--radius-0: 0.375rem;
+		--radius-1: 0.5rem;
+		--radius-2: 0.75rem;
+		--radius-3: 1rem;
+		--radius-4: 1.5rem;
+		--radius-5: 2rem;
+
+		--border-width-0: 1px;
+		--border-width-1: 2px;
+	}
+	/* @link https://utopia.fyi/type/calculator?c=360,18,1.2,1240,20,1.25,5,2,&s=0.75|0.5|0.25,1.5|2|3|4|6,s-l&g=s,l,xl,12 */
+
+	:root {
+		/* Step -2: 12.5px → 12.8px */
+		--step--2: clamp(0.7813rem, 0.7736rem + 0.0341vw, 0.8rem);
+		/* Step -1: 15px → 16px */
+		--step--1: clamp(0.9375rem, 0.9119rem + 0.1136vw, 1rem);
+		/* Step 0: 18px → 20px */
+		--step-0: clamp(1.125rem, 1.0739rem + 0.2273vw, 1.25rem);
+		/* Step 1: 21.6px → 25px */
+		--step-1: clamp(1.35rem, 1.2631rem + 0.3864vw, 1.5625rem);
+		/* Step 2: 25.92px → 31.25px */
+		--step-2: clamp(1.62rem, 1.4837rem + 0.6057vw, 1.9531rem);
+		/* Step 3: 31.104px → 39.0625px */
+		--step-3: clamp(1.944rem, 1.7405rem + 0.9044vw, 2.4414rem);
+		/* Step 4: 37.3248px → 48.8281px */
+		--step-4: clamp(2.3328rem, 2.0387rem + 1.3072vw, 3.0518rem);
+		/* Step 5: 44.7898px → 61.0352px */
+		--step-5: clamp(2.7994rem, 2.384rem + 1.8461vw, 3.8147rem);
+	}
+
+	/* @link https://utopia.fyi/space/calculator?c=360,18,1.2,1240,20,1.25,5,2,&s=0.75|0.5|0.25,1.5|2|3|4|6,s-l&g=s,l,xl,12 */
+
+	:root {
+		--space-3xs: clamp(0.3125rem, 0.3125rem + 0vw, 0.3125rem);
+		--space-2xs: clamp(0.5625rem, 0.5369rem + 0.1136vw, 0.625rem);
+		--space-xs: clamp(0.875rem, 0.8494rem + 0.1136vw, 0.9375rem);
+		--space-s: clamp(1.125rem, 1.0739rem + 0.2273vw, 1.25rem);
+		--space-m: clamp(1.6875rem, 1.6108rem + 0.3409vw, 1.875rem);
+		--space-l: clamp(2.25rem, 2.1477rem + 0.4545vw, 2.5rem);
+		--space-xl: clamp(3.375rem, 3.2216rem + 0.6818vw, 3.75rem);
+		--space-2xl: clamp(4.5rem, 4.2955rem + 0.9091vw, 5rem);
+		--space-3xl: clamp(6.75rem, 6.4432rem + 1.3636vw, 7.5rem);
+
+		/* One-up pairs */
+		--space-3xs-2xs: clamp(0.3125rem, 0.1847rem + 0.5682vw, 0.625rem);
+		--space-2xs-xs: clamp(0.5625rem, 0.4091rem + 0.6818vw, 0.9375rem);
+		--space-xs-s: clamp(0.875rem, 0.7216rem + 0.6818vw, 1.25rem);
+		--space-s-m: clamp(1.125rem, 0.8182rem + 1.3636vw, 1.875rem);
+		--space-m-l: clamp(1.6875rem, 1.3551rem + 1.4773vw, 2.5rem);
+		--space-l-xl: clamp(2.25rem, 1.6364rem + 2.7273vw, 3.75rem);
+		--space-xl-2xl: clamp(3.375rem, 2.7102rem + 2.9545vw, 5rem);
+		--space-2xl-3xl: clamp(4.5rem, 3.2727rem + 5.4545vw, 7.5rem);
+
+		/* Custom pairs */
+		--space-s-l: clamp(1.125rem, 0.5625rem + 2.5vw, 2.5rem);
+	}
+
+	/* @link https://utopia.fyi/grid/calculator?c=360,18,1.2,1240,20,1.25,5,2,&s=0.75|0.5|0.25,1.5|2|3|4|6,s-l&g=s,l,xl,12 */
+
+	:root {
+		--grid-max-width: 77.5rem;
+		--grid-gutter: var(--space-s-l, clamp(1.125rem, 0.5625rem + 2.5vw, 2.5rem));
+		--grid-columns: 12;
+	}
+
+	.u-container {
+		max-width: var(--grid-max-width);
+		padding-inline: var(--grid-gutter);
+		margin-inline: auto;
+	}
+
+	.u-grid {
+		display: grid;
+		gap: var(--grid-gutter);
+	}
+
+	:root {
+		--sans-font: sans-serif;
+	}
+
+	html {
+		font-family: var(--sans-font);
+		scroll-behavior: smooth;
+	}
+
+	body,
+	[data-theme] {
+		color: var(--text-strong-color);
+		background-color: var(--base-color);
+		font-size: var(--step-0);
+		line-height: 1.5;
+	}
+
+	main {
+		width: 100%;
+	}
+
+	h1 {
+		font-size: var(--step-5);
+		margin-bottom: var(--space-s);
+	}
+
+	h2 {
+		font-size: var(--step-4);
+		margin-bottom: var(--space-s);
+	}
+
+	h3 {
+		font-size: var(--step-3);
+		margin-bottom: var(--space-s);
+	}
+
+	h4 {
+		font-size: var(--step-2);
+		margin-bottom: var(--space-s);
+	}
+
+	h5 {
+		font-size: var(--step-1);
+		margin-bottom: var(--space-s);
+	}
+
+	h6 {
+		font-size: var(--step-0);
+		margin-bottom: var(--space-s);
+	}
+
+	p {
+		margin-bottom: var(--space-2xs);
+		max-width: 80ch;
+	}
+
+	blockquote {
+		max-width: 80ch;
+	}
+
+	p,
+	h1,
+	h2,
+	h3,
+	h4,
+	h5,
+	h6 {
+		overflow-wrap: break-word;
+	}
+
+	h1,
+	h2,
+	h3 {
+		line-height: 1.1;
+	}
+
+	button,
+	input[type="submit"],
+	input[type="reset"],
+	input[type="button"] {
+		--button-background: var(--base-color);
+		--button-color: var(--text-strong-color);
+		--button-border-color: var(--stroke-strong-color);
+		border: var(--border-width-1) solid var(--button-border-color);
+		background-color: var(--button-background);
+		color: var(--button-color);
+		padding: var(--space-2xs);
+		line-height: normal;
+		&:enabled:active {
+			--button-background: var(--stroke-weak-color);
+			background-color: var(--button-background);
+		}
+	}
+
+	input[type="range"] {
+		padding: 0;
+	}
+
+	/* Set the cursor to '?' on an abbreviation and style the abbreviation to show that there is more information underneath */
+	abbr[title] {
+		cursor: help;
+		text-decoration-line: underline;
+		text-decoration-style: dotted;
+	}
+
+	input:disabled,
+	textarea:disabled,
+	select:disabled,
+	button[disabled] {
+		--button-background: var(--stroke-weak-color);
+		--button-color: var(--text-weak-color);
+		background-color: var(--button-background);
+		cursor: not-allowed;
+		border-color: var(--button-background);
+		color: var(--button-color);
+	}
+
+	button:enabled:hover,
+	input[type="submit"]:enabled:hover,
+	input[type="reset"]:enabled:hover,
+	input[type="button"]:enabled:hover {
+		--button-background: var(--fill-color);
+		background-color: var(--button-background);
+		cursor: pointer;
+	}
+
+	button:focus-visible:where(:enabled),
+	input:enabled:focus-visible:where(
+		[type="submit"],
+		[type="reset"],
+		[type="button"]
+	) {
+		outline: 2px solid var(--brand-color);
+		outline-offset: 1px;
+	}
+
+	/* Consolidate box styling */
+	aside,
+	details,
+	pre,
+	progress {
+		background-color: var(--fill-color);
+		border: var(--border-width-0) solid var(--stroke-strong-color);
+		border-radius: var(--radius-1);
+	}
+
+	aside {
+		font-size: var(--step--1);
+	}
+
+	article,
+	fieldset,
+	dialog {
+		border: var(--border-width-0) solid var(--stroke-strong-color);
+		border-radius: var(--radius-1);
+	}
+
+	summary {
+		cursor: pointer;
+		word-break: break-word;
+	}
+
+	/* Format tables */
+	table {
+		border-collapse: collapse;
+	}
+
+	figure > table {
+		width: max-content;
+		margin: 0;
+	}
+
+	td,
+	th {
+		border: var(--border-width-0) solid var(--stroke-strong-color);
+		text-align: start;
+	}
+
+	th {
+		background-color: var(--fill-color);
+		font-weight: bold;
+	}
+
+	table caption {
+		font-weight: bold;
+	}
+
+	/* Format forms */
+
+	form {
+		max-width: 80ch;
+		margin: 0 auto;
+	}
+
+	form,
+	fieldset {
+		display: grid;
+		gap: var(--space-s);
+		padding: var(--space-s);
+	}
+
+	textarea,
+	select,
+	input,
+	button {
+		font-size: inherit;
+		font-family: inherit;
+		border-radius: var(--radius-1);
+		box-shadow: none;
+	}
+	textarea,
+	select,
+	input {
+		color: var(--text-strong-color);
+		background-color: var(--fill-color);
+		border: var(--border-width-0) solid var(--stroke-strong-color);
+	}
+
+	:is(input, select, textarea):user-invalid {
+		border-color: var(--error-color);
+		background-color: var(--error-fill-color);
+	}
+
+	[data-input-error] {
+		display: none;
+		color: var(--error-text-color);
+		font-size: var(--step--1);
+	}
+
+	label:has(+ :is(input, select, textarea)[required])::after {
+		content: " *";
+	}
+
+	label:has(+ :is(input, select, textarea)[required]:user-invalid) {
+		color: var(--error-text-color);
+	}
+	:is(input, select, textarea):user-invalid + [data-input-error] {
+		display: inline;
+	}
+
+	.form-group {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-3xs);
+	}
+
+	input {
+		padding: var(--space-2xs);
+	}
+
+	dialog {
+		background-color: var(--overlay-color);
+		max-width: min(100vw - 2rem, 720px);
+		margin: auto;
+	}
+
+	dialog::backdrop {
+		background-color: var(--raised-color);
+		opacity: 0.8;
+	}
+
+	:is(
+		button,
+		input[type="submit"],
+		input[type="reset"],
+		input[type="button"]
+	).normal {
+		--button-background: var(--base-color);
+		--button-color: var(--text-strong-color);
+		--button-border-color: var(--stroke-strong-color);
+		&:enabled:hover {
+			--button-background: var(--fill-color);
+		}
+		&:enabled:active {
+			--button-background: var(--stroke-weak-color);
+		}
+		&:disabled,
+		&[disabled] {
+			--button-background: var(--stroke-weak-color);
+			--button-color: var(--text-weak-color);
+		}
+	}
+
+	:is(
+		button,
+		input[type="submit"],
+		input[type="reset"],
+		input[type="button"]
+	).brand {
+		--button-background: var(--brand-color);
+		--button-color: var(--base-color);
+		--button-border-color: var(--brand-color);
+		&:enabled:hover {
+			--button-color: var(--brand-text-color);
+			--button-background: var(--brand-fill-color);
+		}
+		&:enabled:active {
+			--button-color: var(--brand-text-color);
+			--button-background: var(--brand-stroke-weak-color);
+		}
+		&:disabled,
+		&[disabled] {
+			--button-background: var(--brand-stroke-weak-color);
+		}
+	}
+
+	:is(
+		button,
+		input[type="submit"],
+		input[type="reset"],
+		input[type="button"]
+	).success {
+		--button-background: var(--success-color);
+		--button-color: var(--base-color);
+		--button-border-color: var(--success-color);
+		&:enabled:hover {
+			--button-color: var(--success-text-color);
+			--button-background: var(--success-fill-color);
+		}
+		&:enabled:active {
+			--button-color: var(--success-text-color);
+			--button-background: var(--success-stroke-weak-color);
+		}
+		&:disabled,
+		&[disabled] {
+			--button-background: var(--success-stroke-weak-color);
+		}
+	}
+
+	:is(
+		button,
+		input[type="submit"],
+		input[type="reset"],
+		input[type="button"]
+	).warning {
+		--button-background: var(--warning-color);
+		--button-color: var(--base-color);
+		--button-border-color: var(--warning-color);
+		&:enabled:hover {
+			--button-color: var(--warning-text-color);
+			--button-background: var(--warning-fill-color);
+		}
+		&:enabled:active {
+			--button-color: var(--warning-text-color);
+			--button-background: var(--warning-stroke-weak-color);
+		}
+		&:disabled,
+		&[disabled] {
+			--button-background: var(--warning-stroke-weak-color);
+		}
+	}
+
+	:is(
+		button,
+		input[type="submit"],
+		input[type="reset"],
+		input[type="button"]
+	).error {
+		--button-background: var(--error-color);
+		--button-color: var(--base-color);
+		--button-border-color: var(--error-color);
+		&:enabled:hover {
+			--button-color: var(--error-text-color);
+			--button-background: var(--error-fill-color);
+		}
+		&:enabled:active {
+			--button-color: var(--error-text-color);
+			--button-background: var(--error-stroke-weak-color);
+		}
+		&:disabled,
+		&[disabled] {
+			--button-background: var(--error-stroke-weak-color);
+		}
+	}
+
+	/* Print */
+	@media print {
+		@page {
+			margin: 1cm;
+		}
+		body {
+			display: block;
+		}
+		body > header {
+			background-color: unset;
+		}
+		body > header nav,
+		body > footer {
+			display: none;
+		}
+		article {
+			border: none;
+			padding: 0;
+		}
+		a[href^="http"]::after {
+			content: " <" attr(href) ">";
+		}
+		abbr[title]::after {
+			content: " (" attr(title) ")";
+		}
+		a {
+			text-decoration: none;
+		}
+		p {
+			widows: 3;
+			orphans: 3;
+		}
+		hr {
+			border-top: var(--border-width-0) solid var(--stroke-strong-color);
+		}
+		mark {
+			border: var(--border-width-0) solid var(--stroke-strong-color);
+		}
+		figure {
+			break-inside: avoid;
+		}
+		pre code {
+			white-space: pre-wrap;
+		}
+	}
+}

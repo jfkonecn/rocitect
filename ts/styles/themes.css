@@ -1,0 +1,406 @@
+/*
+ * Brand - used to indicate interactive elements like text links and buttons.
+ * Contrast with fill variation must be at least: 4.5:1
+ *
+ * Text strong - used for primary text, like headings, body content, and form
+ * labels to ensure they’re prominent and legibly
+ * Contrast with fill variation must be at least: 4.5:1
+ * Greatly decrease the brightness of the brand color. Aim for a very dark
+ * gray with a tinge of the brand color. Because this variation is so dark,
+ * you’ll need to saturate it quite heavily.
+ *
+ * Text weak - used for supporting text to make it less prominently
+ * Contrast with fill variation must be at least: 4.5:1
+ * Increase the brightness and decrease the saturation of the previous
+ * variation. Aim for a dark gray with a tinge of the brand color.
+ *
+ * Stroke strong - used for non-decorative borders on interface elements like form
+ * input fields. Also used for icons.
+ * Contrast with fill variation must be at least: 3:1
+ * Increase the brightness and decrease the saturation of the previous
+ * variation. Aim for a medium gray with a tinge of the brand color.
+ *
+ * Stroke weak - used for decorative borders, like dividing lines, that aren’t
+ * critical to identifying interface elements.
+ * This is a decorative color, so it doesn’t need to be high contrast.
+ * Increase the brightness and decrease the saturation of the previous
+ * variation. Aim for a light gray with a tinge of the brand color.
+ *
+ * Fill - used as a secondary background to help differentiate elements, like tags
+ * or badges, that sit on the main white background.
+ * The color of any text and interface elements that sit on this background
+ * color need to have a contrast ratio that meets WCAG 2.1 level AA
+ * accessibility requirements.
+ * Increase the brightness and decrease the saturation of the previous
+ * variation. Aim for a very light gray with a tinge of the brand color.
+ *
+ * Background - Do I need to explain?
+ * Text and interface elements sitting on this color must have sufficient contrast
+ *
+ * Ensure a contrast ratio of 4.5:1 between primary and background colors
+ * https://webaim.org/resources/contrastchecker/
+ *
+ * To help find a brand color
+ * https://coolors.co/
+ *
+ * To help create non-brand colors
+ * https://color.adobe.com/create/color-wheel
+ */
+
+@layer themes {
+	:root {
+		/*
+     * A lot of the duplicated css can be removed once @function becomes widely supported in browsers.
+     * https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/At-rules/@function
+     * */
+
+		--white: #ffffff;
+		--black: #000000;
+
+		--error-color-light: #c73a3a;
+		--error-text-color-light: color-mix(
+			in srgb,
+			var(--error-color-light) 100%,
+			transparent
+		);
+		--error-stroke-strong-color-light: color-mix(
+			in srgb,
+			var(--error-color-light) 80%,
+			transparent
+		);
+		--error-stroke-weak-color-light: color-mix(
+			in srgb,
+			var(--error-color-light) 20%,
+			transparent
+		);
+		--error-fill-color-light: color-mix(
+			in srgb,
+			var(--error-color-light) 5%,
+			transparent
+		);
+
+		--warning-color-light: #8f6c1a;
+		--warning-text-color-light: color-mix(
+			in srgb,
+			var(--warning-color-light) 100%,
+			transparent
+		);
+		--warning-stroke-strong-color-light: color-mix(
+			in srgb,
+			var(--warning-color-light) 80%,
+			transparent
+		);
+		--warning-stroke-weak-color-light: color-mix(
+			in srgb,
+			var(--warning-color-light) 20%,
+			transparent
+		);
+		--warning-fill-color-light: color-mix(
+			in srgb,
+			var(--warning-color-light) 5%,
+			transparent
+		);
+
+		--success-color-light: #067a58;
+		--success-text-color-light: color-mix(
+			in srgb,
+			var(--success-color-light) 100%,
+			transparent
+		);
+		--success-stroke-strong-color-light: color-mix(
+			in srgb,
+			var(--success-color-light) 80%,
+			transparent
+		);
+		--success-stroke-weak-color-light: color-mix(
+			in srgb,
+			var(--success-color-light) 20%,
+			transparent
+		);
+		--success-fill-color-light: color-mix(
+			in srgb,
+			var(--success-color-light) 5%,
+			transparent
+		);
+
+		--error-color-dark: #ff9c9c;
+		--error-text-color-dark: color-mix(
+			in srgb,
+			var(--error-color-dark) 100%,
+			transparent
+		);
+		--error-stroke-strong-color-dark: color-mix(
+			in srgb,
+			var(--error-color-dark) 80%,
+			transparent
+		);
+		--error-stroke-weak-color-dark: color-mix(
+			in srgb,
+			var(--error-color-dark) 20%,
+			transparent
+		);
+		--error-fill-color-dark: color-mix(
+			in srgb,
+			var(--error-color-dark) 5%,
+			transparent
+		);
+
+		--warning-color-dark: #e0bf70;
+		--warning-text-color-dark: color-mix(
+			in srgb,
+			var(--warning-color-dark) 100%,
+			transparent
+		);
+		--warning-stroke-strong-color-dark: color-mix(
+			in srgb,
+			var(--warning-color-dark) 80%,
+			transparent
+		);
+		--warning-stroke-weak-color-dark: color-mix(
+			in srgb,
+			var(--warning-color-dark) 20%,
+			transparent
+		);
+		--warning-fill-color-dark: color-mix(
+			in srgb,
+			var(--warning-color-dark) 5%,
+			transparent
+		);
+
+		--success-color-dark: #77c7af;
+		--success-text-color-dark: color-mix(
+			in srgb,
+			var(--success-color-dark) 100%,
+			transparent
+		);
+		--success-stroke-strong-color-dark: color-mix(
+			in srgb,
+			var(--success-color-dark) 80%,
+			transparent
+		);
+		--success-stroke-weak-color-dark: color-mix(
+			in srgb,
+			var(--success-color-dark) 20%,
+			transparent
+		);
+		--success-fill-color-dark: color-mix(
+			in srgb,
+			var(--success-color-dark) 5%,
+			transparent
+		);
+
+		--theme: light;
+
+		--brand-color-light: #0968c3;
+		--brand-text-color-light: color-mix(
+			in srgb,
+			var(--brand-color-light) 100%,
+			transparent
+		);
+		--brand-stroke-strong-color-light: color-mix(
+			in srgb,
+			var(--brand-color-light) 80%,
+			transparent
+		);
+		--brand-stroke-weak-color-light: color-mix(
+			in srgb,
+			var(--brand-color-light) 20%,
+			transparent
+		);
+		--brand-fill-color-light: color-mix(
+			in srgb,
+			var(--brand-color-light) 5%,
+			transparent
+		);
+
+		--text-strong-color-light: color-mix(
+			in srgb,
+			var(--black) 90%,
+			transparent
+		);
+		--text-weak-color-light: color-mix(in srgb, var(--black) 60%, transparent);
+		--stroke-strong-color-light: color-mix(
+			in srgb,
+			var(--black) 45%,
+			transparent
+		);
+		--stroke-weak-color-light: color-mix(
+			in srgb,
+			var(--black) 10%,
+			transparent
+		);
+		--fill-color-light: color-mix(in srgb, var(--black) 4%, transparent);
+		--base-color-light: #ffffff;
+		--raised-color-light: #ffffff;
+		--overlay-color-light: #ffffff;
+
+		--brand-color-dark: #2490f5;
+		--brand-text-color-dark: color-mix(
+			in srgb,
+			var(--brand-color-dark) 100%,
+			transparent
+		);
+		--brand-stroke-strong-color-dark: color-mix(
+			in srgb,
+			var(--brand-color-dark) 80%,
+			transparent
+		);
+		--brand-stroke-weak-color-dark: color-mix(
+			in srgb,
+			var(--brand-color-dark) 20%,
+			transparent
+		);
+		--brand-fill-color-dark: color-mix(
+			in srgb,
+			var(--brand-color-dark) 5%,
+			transparent
+		);
+
+		--text-strong-color-dark: #ffffff;
+		--text-weak-color-dark: color-mix(in srgb, var(--white) 78%, transparent);
+		--stroke-strong-color-dark: color-mix(
+			in srgb,
+			var(--white) 60%,
+			transparent
+		);
+		--stroke-weak-color-dark: color-mix(in srgb, var(--white) 12%, transparent);
+		--fill-color-dark: color-mix(in srgb, var(--white) 6%, transparent);
+		--base-color-dark: #000000;
+		--raised-color-dark: #262626;
+		--overlay-color-dark: #333333;
+	}
+
+	@media (prefers-color-scheme: dark) {
+		:root {
+			--theme: dark;
+		}
+	}
+
+	:root {
+		color-scheme: var(--theme);
+	}
+
+	/* Allow manual theme overriding */
+	[data-theme="light"] {
+		--theme: light;
+		color-scheme: light;
+	}
+	[data-theme="dark"] {
+		--theme: dark;
+		color-scheme: dark;
+	}
+
+	:where(:root, [data-theme="light"], [data-theme="dark"]) {
+		--error-color: light-dark(
+			var(--error-color-light),
+			var(--error-color-dark)
+		);
+		--error-text-color: light-dark(
+			var(--error-text-color-light),
+			var(--error-text-color-dark)
+		);
+		--error-stroke-strong-color: light-dark(
+			var(--error-stroke-strong-color-light),
+			var(--error-stroke-strong-color-dark)
+		);
+		--error-stroke-weak-color: light-dark(
+			var(--error-stroke-weak-color-light),
+			var(--error-stroke-weak-color-dark)
+		);
+		--error-fill-color: light-dark(
+			var(--error-fill-color-light),
+			var(--error-fill-color-dark)
+		);
+
+		--warning-color: light-dark(
+			var(--warning-color-light),
+			var(--warning-color-dark)
+		);
+		--warning-text-color: light-dark(
+			var(--warning-text-color-light),
+			var(--warning-text-color-dark)
+		);
+		--warning-stroke-strong-color: light-dark(
+			var(--warning-stroke-strong-color-light),
+			var(--warning-stroke-strong-color-dark)
+		);
+		--warning-stroke-weak-color: light-dark(
+			var(--warning-stroke-weak-color-light),
+			var(--warning-stroke-weak-color-dark)
+		);
+		--warning-fill-color: light-dark(
+			var(--warning-fill-color-light),
+			var(--warning-fill-color-dark)
+		);
+
+		--success-color: light-dark(
+			var(--success-color-light),
+			var(--success-color-dark)
+		);
+		--success-text-color: light-dark(
+			var(--success-text-color-light),
+			var(--success-text-color-dark)
+		);
+		--success-stroke-strong-color: light-dark(
+			var(--success-stroke-strong-color-light),
+			var(--success-stroke-strong-color-dark)
+		);
+		--success-stroke-weak-color: light-dark(
+			var(--success-stroke-weak-color-light),
+			var(--success-stroke-weak-color-dark)
+		);
+		--success-fill-color: light-dark(
+			var(--success-fill-color-light),
+			var(--success-fill-color-dark)
+		);
+
+		--brand-color: light-dark(
+			var(--brand-color-light),
+			var(--brand-color-dark)
+		);
+		--brand-text-color: light-dark(
+			var(--brand-text-color-light),
+			var(--brand-text-color-dark)
+		);
+		--brand-stroke-strong-color: light-dark(
+			var(--brand-stroke-strong-color-light),
+			var(--brand-stroke-strong-color-dark)
+		);
+		--brand-stroke-weak-color: light-dark(
+			var(--brand-stroke-weak-color-light),
+			var(--brand-stroke-weak-color-dark)
+		);
+		--brand-fill-color: light-dark(
+			var(--brand-fill-color-light),
+			var(--brand-fill-color-dark)
+		);
+
+		--text-strong-color: light-dark(
+			var(--text-strong-color-light),
+			var(--text-strong-color-dark)
+		);
+		--text-weak-color: light-dark(
+			var(--text-weak-color-light),
+			var(--text-weak-color-dark)
+		);
+		--stroke-strong-color: light-dark(
+			var(--stroke-strong-color-light),
+			var(--stroke-strong-color-dark)
+		);
+		--stroke-weak-color: light-dark(
+			var(--stroke-weak-color-light),
+			var(--stroke-weak-color-dark)
+		);
+		--fill-color: light-dark(var(--fill-color-light), var(--fill-color-dark));
+
+		--base-color: light-dark(var(--base-color-light), var(--base-color-dark));
+		--raised-color: light-dark(
+			var(--raised-color-light),
+			var(--raised-color-dark)
+		);
+		--overlay-color: light-dark(
+			var(--overlay-color-light),
+			var(--overlay-color-dark)
+		);
+	}
+}

@@ -75,7 +75,11 @@ fn planPage(_: *httpz.Request, res: *httpz.Response) !void {
     const writer = res.writer();
     try writer.writeAll("<!doctype html><html><head><meta charset=\"utf-8\">");
     for (g_assets.?.urls) |url| {
-        try writer.print("<script type=\"module\" src=\"{s}\"></script>", .{url});
+        if (std.mem.endsWith(u8, url, ".css")) {
+            try writer.print("<link rel=\"stylesheet\" href=\"{s}\">", .{url});
+        } else {
+            try writer.print("<script type=\"module\" src=\"{s}\"></script>", .{url});
+        }
     }
     try writer.writeAll("</head><body>");
     try writer.writeAll(html.asSlice());
@@ -108,7 +112,11 @@ fn assetFile(req: *httpz.Request, res: *httpz.Response) !void {
     };
 
     res.body = bytes;
-    res.content_type = if (is_source_map) .JSON else .JS;
+    if (std.mem.endsWith(u8, requested_url, ".css")) {
+        res.header("Content-Type", "text/css; charset=utf-8");
+    } else {
+        res.content_type = if (is_source_map) .JSON else .JS;
+    }
     res.header(
         "Cache-Control",
         if (is_source_map) "no-cache" else "public, max-age=31536000, immutable",
@@ -150,15 +158,16 @@ fn stringLessThan(_: void, left: []const u8, right: []const u8) bool {
 
 fn isAssetUrl(url: []const u8) bool {
     if (!std.mem.startsWith(u8, url, "/assets/") or
-        !std.mem.endsWith(u8, url, ".js")) return false;
+        (!std.mem.endsWith(u8, url, ".js") and !std.mem.endsWith(u8, url, ".css"))) return false;
     for (url["/assets/".len..]) |byte| {
         if (!std.ascii.isAlphanumeric(byte) and byte != '-' and byte != '_' and byte != '.') return false;
     }
     return true;
 }
 
-test "asset URLs are safe flat JavaScript paths" {
+test "asset URLs are safe flat JavaScript or CSS paths" {
     try std.testing.expect(isAssetUrl("/assets/feature-a-ABC123.js"));
+    try std.testing.expect(isAssetUrl("/assets/styles-ABC123.css"));
     try std.testing.expect(!isAssetUrl("/assets/nested/feature-a.js"));
     try std.testing.expect(!isAssetUrl("/assets/feature-a.js.map"));
     try std.testing.expect(!isAssetUrl("/assets/feature-a.js\""));

@@ -15,7 +15,10 @@ async function findEntries(directory) {
 		const childPath = path.join(directory, child.name);
 		if (child.isDirectory()) {
 			entries.push(...(await findEntries(childPath)));
-		} else if (child.isFile() && child.name === "index.ts") {
+		} else if (
+			child.isFile() &&
+			(child.name === "index.ts" || child.name === "index.css")
+		) {
 			entries.push(childPath);
 		}
 	}

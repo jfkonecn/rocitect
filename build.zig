@@ -126,15 +126,43 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&docs.step);
 
     // Unit tests for platform code
+    const httpz_native = b.dependency("httpz", .{
+        .target = native_target,
+        .optimize = optimize,
+    });
+    const httpz_native_module = httpz_native.module("httpz");
+    httpz_native_module.link_libc = false;
+    const websocket_native = httpz_native.builder.dependency("websocket", .{
+        .target = native_target,
+        .optimize = optimize,
+    });
+    websocket_native.module("websocket").link_libc = false;
+
     const host_tests = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/host.zig"),
             .target = native_target,
             .optimize = optimize,
+            .link_libc = false,
         }),
     });
+    host_tests.root_module.addImport("httpz", httpz_native_module);
 
     const run_host_tests = b.addRunArtifact(host_tests);
+
+    const datastar_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/datastar.zig"),
+            .target = native_target,
+            .optimize = optimize,
+            .link_libc = false,
+        }),
+    });
+    datastar_tests.root_module.addImport("httpz", httpz_native_module);
+
+    const run_datastar_tests = b.addRunArtifact(datastar_tests);
+    const datastar_test_step = b.step("datastar-test", "Run Datastar unit tests");
+    datastar_test_step.dependOn(&run_datastar_tests.step);
 
     // Integration test runner
     const test_runner = b.addExecutable(.{
@@ -162,6 +190,7 @@ pub fn build(b: *std.Build) void {
     run_integration.addArgs(&.{ "--examples-dir", ".zig-cache/local-examples/examples" });
     // Run integration after unit tests
     run_integration.step.dependOn(&run_host_tests.step);
+    run_integration.step.dependOn(&run_datastar_tests.step);
     // Pass through args (e.g. --verbose)
     if (b.args) |args| {
         run_integration.addArgs(args);

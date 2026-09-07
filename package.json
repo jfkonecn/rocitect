@@ -2,7 +2,6 @@
   "name": "rocitect",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
   "scripts": {
     "build": "node scripts/build-indexes.cjs",
     "build:dev": "node scripts/build-indexes.cjs --dev",
