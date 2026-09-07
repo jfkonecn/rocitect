@@ -46,6 +46,11 @@ FunctionRef := {
 
 FunctionOutput(customPrimitive, customCollection) := [NoOutput, Output(TypeDefinition(customPrimitive, customCollection))]
 
+PerformanceEstimate(customPerformanceValue, customPerformanceUnit) := {
+	value : customPerformanceValue,
+	unit : customPerformanceUnit,
+}
+
 FilterLogic(customLogic) := [FilterDescription(Str), CustomFilterLogic(customLogic)]
 
 SortLogic(customLogic) := [SortDescription(Str), CustomSortLogic(customLogic)]
@@ -67,7 +72,7 @@ DistributionCondition(customPrimitive, customCollection, customLogic) := {
 	functionCalls : List(FunctionRef),
 }
 
-UnitOperation(customPrimitive, customCollection, customLogic) := [
+UnitOperation(customPrimitive, customCollection, customLogic, customPerformanceValue, customPerformanceUnit) := [
 	# A Map unit operation converts one value or type into another.
 	Map(
 		{
@@ -75,6 +80,7 @@ UnitOperation(customPrimitive, customCollection, customLogic) := [
 			output : VariableDefinition(customPrimitive, customCollection),
 			functionCalls : List(FunctionRef),
 			codeComments : CodeComments,
+			performanceEstimate : List(PerformanceEstimate(customPerformanceValue, customPerformanceUnit)),
 		},
 	),
 	# A Filter unit operation removes, rejects, or reroutes data.
@@ -85,6 +91,7 @@ UnitOperation(customPrimitive, customCollection, customLogic) := [
 			filterLogic : FilterLogic(customLogic),
 			functionCalls : List(FunctionRef),
 			codeComments : CodeComments,
+			performanceEstimate : List(PerformanceEstimate(customPerformanceValue, customPerformanceUnit)),
 		},
 	),
 	Sort(
@@ -94,6 +101,7 @@ UnitOperation(customPrimitive, customCollection, customLogic) := [
 			functionCalls : List(FunctionRef),
 			sortLogic : SortLogic(customLogic),
 			codeComments : CodeComments,
+			performanceEstimate : List(PerformanceEstimate(customPerformanceValue, customPerformanceUnit)),
 		},
 	),
 	# A Distribution unit operation chooses where data goes next, such as branching.
@@ -102,6 +110,7 @@ UnitOperation(customPrimitive, customCollection, customLogic) := [
 			input : VariableDefinition(customPrimitive, customCollection),
 			codeComments : CodeComments,
 			conditions : List(DistributionCondition(customPrimitive, customCollection, customLogic)),
+			performanceEstimate : List(PerformanceEstimate(customPerformanceValue, customPerformanceUnit)),
 		},
 	),
 	# A Validate unit operation checks data integrity.
@@ -113,6 +122,7 @@ UnitOperation(customPrimitive, customCollection, customLogic) := [
 			failureOutput : VariableDefinition(customPrimitive, customCollection),
 			codeComments : CodeComments,
 			functionCalls : List(FunctionRef),
+			performanceEstimate : List(PerformanceEstimate(customPerformanceValue, customPerformanceUnit)),
 		},
 	),
 	# An Authenticate unit operation determines the identity initiating a flow.
@@ -124,6 +134,7 @@ UnitOperation(customPrimitive, customCollection, customLogic) := [
 			failureOutput : VariableDefinition(customPrimitive, customCollection),
 			codeComments : CodeComments,
 			functionCalls : List(FunctionRef),
+			performanceEstimate : List(PerformanceEstimate(customPerformanceValue, customPerformanceUnit)),
 		},
 	),
 	# An Authorize unit operation determines whether an authenticated identity may perform an action.
@@ -135,6 +146,7 @@ UnitOperation(customPrimitive, customCollection, customLogic) := [
 			failureOutput : VariableDefinition(customPrimitive, customCollection),
 			codeComments : CodeComments,
 			functionCalls : List(FunctionRef),
+			performanceEstimate : List(PerformanceEstimate(customPerformanceValue, customPerformanceUnit)),
 		},
 	),
 	# A GlobalStateRead unit operation reads values whose lifetime extends beyond the current call stack.
@@ -143,6 +155,7 @@ UnitOperation(customPrimitive, customCollection, customLogic) := [
 			output : VariableDefinition(customPrimitive, customCollection),
 			codeComments : CodeComments,
 			functionCalls : List(FunctionRef),
+			performanceEstimate : List(PerformanceEstimate(customPerformanceValue, customPerformanceUnit)),
 		},
 	),
 	# A GlobalStateWrite unit operation writes values whose lifetime extends beyond the current call stack.
@@ -151,6 +164,7 @@ UnitOperation(customPrimitive, customCollection, customLogic) := [
 			input : VariableDefinition(customPrimitive, customCollection),
 			codeComments : CodeComments,
 			functionCalls : List(FunctionRef),
+			performanceEstimate : List(PerformanceEstimate(customPerformanceValue, customPerformanceUnit)),
 		},
 	),
 	# An InputOutput unit operation communicates outside the program, including HTTP, databases, etc.
@@ -162,6 +176,7 @@ UnitOperation(customPrimitive, customCollection, customLogic) := [
 			failureOutput : VariableDefinition(customPrimitive, customCollection),
 			codeComments : CodeComments,
 			functionCalls : List(FunctionRef),
+			performanceEstimate : List(PerformanceEstimate(customPerformanceValue, customPerformanceUnit)),
 		},
 	),
 	# A Panic unit operation terminates execution of the program.
@@ -169,17 +184,18 @@ UnitOperation(customPrimitive, customCollection, customLogic) := [
 		{
 			description : Str,
 			codeComments : CodeComments,
+			performanceEstimate : List(PerformanceEstimate(customPerformanceValue, customPerformanceUnit)),
 		},
 	),
 ]
 
-FunctionDefinition(customPrimitive, customCollection, customLogic) := {
+FunctionDefinition(customPrimitive, customCollection, customLogic, customPerformanceValue, customPerformanceUnit) := {
 	id : DefinitionId,
 	functionName : Str,
 	inputs : List(VariableDefinition(customPrimitive, customCollection)),
 	output : FunctionOutput(customPrimitive, customCollection),
 	codeComments : CodeComments,
-	unitOperations : List(UnitOperation(customPrimitive, customCollection, customLogic)),
+	unitOperations : List(UnitOperation(customPrimitive, customCollection, customLogic, customPerformanceValue, customPerformanceUnit)),
 }
 
 TestCase := {
@@ -187,9 +203,9 @@ TestCase := {
 	description : Str,
 }
 
-TestSuite(customPrimitive, customCollection, customLogic) := {
+TestSuite(customPrimitive, customCollection, customLogic, customPerformanceValue, customPerformanceUnit) := {
 	id : DefinitionId,
 	name : Str,
-	functionDefinition : FunctionDefinition(customPrimitive, customCollection, customLogic),
+	functionDefinition : FunctionDefinition(customPrimitive, customCollection, customLogic, customPerformanceValue, customPerformanceUnit),
 	testCases : List(TestCase),
 }
