@@ -1,138 +1,167 @@
-import Host
-
 CodeComments := [Uncommented, Comments(Str)]
 
-TypeDefinition := [
+DefinitionId := Str
+
+PrimitiveKind(customPrimitive) := [String, Int, Float, Bool, Decimal, Bytes, Time, CustomPrimitive(customPrimitive)]
+
+CollectionKind(customCollection) := [List, Set, Stream, CustomCollection(customCollection)]
+
+TypeDefinition(customPrimitive, customCollection) := [
 	Primitive(
 		{
-			primitiveType : Str,
+			primitiveType : PrimitiveKind(customPrimitive),
 		},
 	),
 	Collection(
 		{
-			collectionType : Str,
-			typeDefinition : TypeDefinition,
+			collectionType : CollectionKind(customCollection),
+			typeDefinition : TypeDefinition(customPrimitive, customCollection),
 		},
 	),
 	Struct(
 		{
-			id : [Str, None],
+			id : DefinitionId,
 			typeName : Str,
 			codeComments : CodeComments,
-			fields : List(StructTypeField),
+			fields : List(StructTypeField(customPrimitive, customCollection)),
 		},
 	),
 ]
 
-StructTypeField := {
+StructTypeField(customPrimitive, customCollection) := {
 	name : Str,
 	codeComments : CodeComments,
-	typeDefinition : [NoType, Type(TypeDefinition)],
+	typeDefinition : TypeDefinition(customPrimitive, customCollection),
 }
 
-VariableDefinition := {
+VariableDefinition(customPrimitive, customCollection) := {
 	name : Str,
-	typeDefinition : [NoType, Type(TypeDefinition)],
+	typeDefinition : TypeDefinition(customPrimitive, customCollection),
 }
 
-DistributionCondition := {
-	condition : Str,
-	output : [NoVariable, Variable(VariableDefinition)],
+FunctionRef := {
+	id : DefinitionId,
+	functionName : Str,
+}
+
+FunctionOutput(customPrimitive, customCollection) := [NoOutput, Output(TypeDefinition(customPrimitive, customCollection))]
+
+FilterLogic(customLogic) := [FilterDescription(Str), CustomFilterLogic(customLogic)]
+
+SortLogic(customLogic) := [SortDescription(Str), CustomSortLogic(customLogic)]
+
+DistributionLogic(customLogic) := [ConditionDescription(Str), CustomDistributionLogic(customLogic)]
+
+ValidationLogic(customLogic) := [ValidationDescription(Str), CustomValidationLogic(customLogic)]
+
+AuthenticationLogic(customLogic) := [AuthenticationDescription(Str), CustomAuthenticationLogic(customLogic)]
+
+AuthorizationLogic(customLogic) := [AuthorizationDescription(Str), CustomAuthorizationLogic(customLogic)]
+
+InputOutputLogic(customLogic) := [InputOutputDescription(Str), CustomInputOutputLogic(customLogic)]
+
+DistributionCondition(customPrimitive, customCollection, customLogic) := {
+	logic : DistributionLogic(customLogic),
+	output : VariableDefinition(customPrimitive, customCollection),
 	codeComments : CodeComments,
-	functionCalls : List([NoFunction, Function(FunctionDefinition)]),
+	functionCalls : List(FunctionRef),
 }
 
-UnitOperation := [
+UnitOperation(customPrimitive, customCollection, customLogic) := [
 	# A Map unit operation converts one value or type into another.
 	Map(
 		{
-			input : [NoVariable, Variable(VariableDefinition)],
-			output : [NoVariable, Variable(VariableDefinition)],
-			functionCalls : List([NoFunction, Function(FunctionDefinition)]),
+			input : VariableDefinition(customPrimitive, customCollection),
+			output : VariableDefinition(customPrimitive, customCollection),
+			functionCalls : List(FunctionRef),
 			codeComments : CodeComments,
 		},
 	),
 	# A Filter unit operation removes, rejects, or reroutes data.
 	Filter(
 		{
-			input : [NoVariable, Variable(VariableDefinition)],
-			output : [NoVariable, Variable(VariableDefinition)],
-			filterLogic : Str,
-			functionCalls : List([NoFunction, Function(FunctionDefinition)]),
-			codeComments : Str,
+			input : VariableDefinition(customPrimitive, customCollection),
+			output : VariableDefinition(customPrimitive, customCollection),
+			filterLogic : FilterLogic(customLogic),
+			functionCalls : List(FunctionRef),
+			codeComments : CodeComments,
 		},
 	),
 	Sort(
 		{
-			input : [NoVariable, Variable(VariableDefinition)],
-			functionCalls : List([NoFunction, Function(FunctionDefinition)]),
-			sortLogic : Str,
+			input : VariableDefinition(customPrimitive, customCollection),
+			output : VariableDefinition(customPrimitive, customCollection),
+			functionCalls : List(FunctionRef),
+			sortLogic : SortLogic(customLogic),
 			codeComments : CodeComments,
 		},
 	),
 	# A Distribution unit operation chooses where data goes next, such as branching.
 	Distribution(
 		{
-			input : [NoVariable, Variable(VariableDefinition)],
+			input : VariableDefinition(customPrimitive, customCollection),
 			codeComments : CodeComments,
-			conditions : List(DistributionCondition),
+			conditions : List(DistributionCondition(customPrimitive, customCollection, customLogic)),
 		},
 	),
 	# A Validate unit operation checks data integrity.
 	Validate(
 		{
-			input : [NoVariable, Variable(VariableDefinition)],
-			successOutput : [NoVariable, Variable(VariableDefinition)],
-			failureOutput : [NoVariable, Variable(VariableDefinition)],
+			input : VariableDefinition(customPrimitive, customCollection),
+			validationLogic : ValidationLogic(customLogic),
+			successOutput : VariableDefinition(customPrimitive, customCollection),
+			failureOutput : VariableDefinition(customPrimitive, customCollection),
 			codeComments : CodeComments,
-			functionCalls : List([NoFunction, Function(FunctionDefinition)]),
+			functionCalls : List(FunctionRef),
 		},
 	),
 	# An Authenticate unit operation determines the identity initiating a flow.
 	Authenticate(
 		{
-			input : [NoVariable, Variable(VariableDefinition)],
-			successOutput : [NoVariable, Variable(VariableDefinition)],
-			failureOutput : [NoVariable, Variable(VariableDefinition)],
+			input : VariableDefinition(customPrimitive, customCollection),
+			authenticationLogic : AuthenticationLogic(customLogic),
+			successOutput : VariableDefinition(customPrimitive, customCollection),
+			failureOutput : VariableDefinition(customPrimitive, customCollection),
 			codeComments : CodeComments,
-			functionCalls : List([NoFunction, Function(FunctionDefinition)]),
+			functionCalls : List(FunctionRef),
 		},
 	),
 	# An Authorize unit operation determines whether an authenticated identity may perform an action.
 	Authorize(
 		{
-			input : [NoVariable, Variable(VariableDefinition)],
-			authorizeConditions : Str,
-			successOutput : [NoVariable, Variable(VariableDefinition)],
-			failureOutput : [NoVariable, Variable(VariableDefinition)],
+			input : VariableDefinition(customPrimitive, customCollection),
+			authorizationLogic : AuthorizationLogic(customLogic),
+			successOutput : VariableDefinition(customPrimitive, customCollection),
+			failureOutput : VariableDefinition(customPrimitive, customCollection),
 			codeComments : CodeComments,
-			functionCalls : List([NoFunction, Function(FunctionDefinition)]),
+			functionCalls : List(FunctionRef),
 		},
 	),
 	# A GlobalStateRead unit operation reads values whose lifetime extends beyond the current call stack.
 	GlobalStateRead(
 		{
-			output : [NoVariable, Variable(VariableDefinition)],
+			output : VariableDefinition(customPrimitive, customCollection),
 			codeComments : CodeComments,
-			functionCalls : List([NoFunction, Function(FunctionDefinition)]),
+			functionCalls : List(FunctionRef),
 		},
 	),
 	# A GlobalStateWrite unit operation writes values whose lifetime extends beyond the current call stack.
 	GlobalStateWrite(
 		{
-			input : [NoVariable, Variable(VariableDefinition)],
+			input : VariableDefinition(customPrimitive, customCollection),
 			codeComments : CodeComments,
-			functionCalls : List([NoFunction, Function(FunctionDefinition)]),
+			functionCalls : List(FunctionRef),
 		},
 	),
 	# An InputOutput unit operation communicates outside the program, including HTTP, databases, etc.
 	InputOutput(
 		{
-			input : [NoVariable, Variable(VariableDefinition)],
-			successOutput : [NoVariable, Variable(VariableDefinition)],
-			failureOutput : [NoVariable, Variable(VariableDefinition)],
+			input : VariableDefinition(customPrimitive, customCollection),
+			inputOutputLogic : InputOutputLogic(customLogic),
+			successOutput : VariableDefinition(customPrimitive, customCollection),
+			failureOutput : VariableDefinition(customPrimitive, customCollection),
 			codeComments : CodeComments,
-			functionCalls : List([NoFunction, Function(FunctionDefinition)]),
+			functionCalls : List(FunctionRef),
 		},
 	),
 	# A Panic unit operation terminates execution of the program.
@@ -144,11 +173,13 @@ UnitOperation := [
 	),
 ]
 
-FunctionDefinition := {
-	id : [Unspecified, Specified(Str)],
+FunctionDefinition(customPrimitive, customCollection, customLogic) := {
+	id : DefinitionId,
 	functionName : Str,
+	inputs : List(VariableDefinition(customPrimitive, customCollection)),
+	output : FunctionOutput(customPrimitive, customCollection),
 	codeComments : CodeComments,
-	unitOperations : List([NoOperation, Operation(UnitOperation)]),
+	unitOperations : List(UnitOperation(customPrimitive, customCollection, customLogic)),
 }
 
 TestCase := {
@@ -156,9 +187,9 @@ TestCase := {
 	description : Str,
 }
 
-TestSuite := {
-	id : [Unspecified, Specified(Str)],
+TestSuite(customPrimitive, customCollection, customLogic) := {
+	id : DefinitionId,
 	name : Str,
-	functionDefinition : [NoFunction, Function(FunctionDefinition)],
-	testCases : List([NoTestCase, TestCase(TestCase)]),
+	functionDefinition : FunctionDefinition(customPrimitive, customCollection, customLogic),
+	testCases : List(TestCase),
 }
