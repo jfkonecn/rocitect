@@ -11,6 +11,18 @@ pub const std_options: std.Options = .{
 /// Private RocHost used by exported runtime symbols and the page handler.
 var g_roc_host: ?*abi.RocHost = null;
 
+const AssetManifest = struct {
+    urls: []const []const u8,
+
+    fn deinit(self: AssetManifest, allocator: std.mem.Allocator) void {
+        for (self.urls) |url| allocator.free(url);
+        allocator.free(self.urls);
+    }
+};
+
+/// Asset URLs are loaded once at startup from the TypeScript build manifest.
+var g_assets: ?AssetManifest = null;
+
 // OS-specific entry point handling (not exported during tests)
 comptime {
     if (!builtin.is_test) {
@@ -57,8 +69,99 @@ fn planPage(_: *httpz.Request, res: *httpz.Response) !void {
     var html = abi.roc_plan_page();
     defer html.decref(roc_host);
 
-    res.body = try res.arena.dupe(u8, html.asSlice());
     res.content_type = .HTML;
+    res.header("Cache-Control", "no-cache");
+
+    const writer = res.writer();
+    try writer.writeAll("<!doctype html><html><head><meta charset=\"utf-8\">");
+    for (g_assets.?.urls) |url| {
+        try writer.print("<script type=\"module\" src=\"{s}\"></script>", .{url});
+    }
+    try writer.writeAll("</head><body>");
+    try writer.writeAll(html.asSlice());
+    try writer.writeAll("</body></html>");
+}
+
+fn assetFile(req: *httpz.Request, res: *httpz.Response) !void {
+    const requested_url = req.url.path;
+    const is_known_asset = for (g_assets.?.urls) |url| {
+        if (std.mem.eql(u8, requested_url, url)) break true;
+        if (std.mem.endsWith(u8, requested_url, ".map") and
+            std.mem.eql(u8, requested_url[0 .. requested_url.len - ".map".len], url)) break true;
+    } else false;
+    if (!is_known_asset) {
+        res.setStatus(.not_found);
+        return;
+    }
+
+    const is_source_map = std.mem.endsWith(u8, requested_url, ".map");
+    const filename = requested_url["/assets/".len..];
+    const asset_path = try std.fmt.allocPrint(res.arena, "dist/{s}", .{filename});
+    const buffer = try res.arena.alloc(u8, 10 * 1024 * 1024);
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const bytes = std.Io.Dir.cwd().readFile(io, asset_path, buffer) catch |err| switch (err) {
+        error.FileNotFound => {
+            res.setStatus(.not_found);
+            return;
+        },
+        else => return err,
+    };
+
+    res.body = bytes;
+    res.content_type = if (is_source_map) .JSON else .JS;
+    res.header(
+        "Cache-Control",
+        if (is_source_map) "no-cache" else "public, max-age=31536000, immutable",
+    );
+}
+
+fn loadAssetManifest(io: std.Io, allocator: std.mem.Allocator) !AssetManifest {
+    const manifest_buffer = try allocator.alloc(u8, 1024 * 1024);
+    defer allocator.free(manifest_buffer);
+    const manifest_bytes = try std.Io.Dir.cwd().readFile(io, "dist/manifest.json", manifest_buffer);
+
+    var parsed = try std.json.parseFromSlice(std.json.Value, allocator, manifest_bytes, .{});
+    defer parsed.deinit();
+
+    if (parsed.value != .object) return error.InvalidManifest;
+    var urls = std.ArrayList([]const u8).empty;
+    errdefer {
+        for (urls.items) |url| allocator.free(url);
+        urls.deinit(allocator);
+    }
+
+    var iterator = parsed.value.object.iterator();
+    while (iterator.next()) |entry| {
+        if (entry.value_ptr.* != .string) return error.InvalidManifest;
+        const url = entry.value_ptr.string;
+        if (!isAssetUrl(url)) {
+            return error.InvalidManifest;
+        }
+        try urls.append(allocator, try allocator.dupe(u8, url));
+    }
+
+    std.mem.sort([]const u8, urls.items, {}, stringLessThan);
+    return .{ .urls = try urls.toOwnedSlice(allocator) };
+}
+
+fn stringLessThan(_: void, left: []const u8, right: []const u8) bool {
+    return std.mem.order(u8, left, right) == .lt;
+}
+
+fn isAssetUrl(url: []const u8) bool {
+    if (!std.mem.startsWith(u8, url, "/assets/") or
+        !std.mem.endsWith(u8, url, ".js")) return false;
+    for (url["/assets/".len..]) |byte| {
+        if (!std.ascii.isAlphanumeric(byte) and byte != '-' and byte != '_' and byte != '.') return false;
+    }
+    return true;
+}
+
+test "asset URLs are safe flat JavaScript paths" {
+    try std.testing.expect(isAssetUrl("/assets/feature-a-ABC123.js"));
+    try std.testing.expect(!isAssetUrl("/assets/nested/feature-a.js"));
+    try std.testing.expect(!isAssetUrl("/assets/feature-a.js.map"));
+    try std.testing.expect(!isAssetUrl("/assets/feature-a.js\""));
 }
 
 fn hostAlloc(length: usize, alignment: usize) callconv(.c) ?*anyopaque {
@@ -112,6 +215,11 @@ fn platform_main(argc: usize, argv: [*][*:0]u8) c_int {
 
     var roc_host = abi.makeRocHost(&roc_env);
     g_roc_host = &roc_host;
+    g_assets = loadAssetManifest(io, gpa.allocator()) catch |err| {
+        std.log.err("failed to load dist/manifest.json: {s}; run npm run build", .{@errorName(err)});
+        return 1;
+    };
+    defer g_assets.?.deinit(gpa.allocator());
 
     var server = httpz.Server(void).init(io, gpa.allocator(), .{
         .address = .localhost(8080),
@@ -127,6 +235,7 @@ fn platform_main(argc: usize, argv: [*][*:0]u8) c_int {
         return 1;
     };
     router.get("/", planPage, .{});
+    router.get("/assets/*", assetFile, .{});
 
     std.log.info("serving http://localhost:8080/", .{});
     server.listen() catch |err| {
