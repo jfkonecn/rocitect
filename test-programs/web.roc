@@ -18,20 +18,20 @@ plan_page! = |kind, id| BlueprintGeneration.generateBlueprintPage(kind, id, [fun
 referenceItems : List(ReferenceInformation.ReferenceItem({}, {}))
 referenceItems = [
 	{
-		id: "reference:implementation-guidance",
-		title: "Implementation guidance",
+		id: "reference:go-language-manual",
+		title: "Go programming language manual",
 		kind: Documentation,
-		source: Inline,
-		content: Markdown("Use the Roc-defined unit operation data as the source of truth for generated implementation prompts."),
-		tags: ["mcp", "implementation", "roc"],
+		source: Url("https://go.dev/ref/spec"),
+		content: Markdown("Use the Go language specification and standard library conventions when implementing the command-line weather tool."),
+		tags: ["go", "language", "implementation"],
 	},
 	{
-		id: "reference:progress-tracking",
-		title: "Progress tracking",
-		kind: BusinessLogic,
-		source: Inline,
-		content: Text("MCP tools should tell the LLM to record progress as it makes changes."),
-		tags: ["todo", "progress", "tools"],
+		id: "reference:weather-gov-api-docs",
+		title: "weather.gov API documentation",
+		kind: Documentation,
+		source: Url("https://api.weather.gov/"),
+		content: Markdown("Use the weather.gov API documentation for endpoint selection, request headers, response shape, and forecast data fields."),
+		tags: ["weather.gov", "api", "implementation"],
 	},
 ]
 
@@ -132,16 +132,16 @@ testSuiteToImplement = {
 
 mcp_resources! : {} => Str
 mcp_resources! = |_|
-	"[{\"uri\":\"rocitect://references/implementation-guidance\",\"name\":\"Implementation guidance\",\"description\":\"Reference data from platform/ReferenceInformation.roc.\",\"mimeType\":\"text/markdown\"},{\"uri\":\"rocitect://references/progress-tracking\",\"name\":\"Progress tracking\",\"description\":\"Reference data from platform/ReferenceInformation.roc.\",\"mimeType\":\"text/plain\"}]"
+	"[{\"uri\":\"rocitect://references/go-language-manual\",\"name\":\"Go programming language manual\",\"description\":\"Language reference for implementing the weather.gov CLI in Go.\",\"mimeType\":\"text/markdown\"},{\"uri\":\"rocitect://references/weather-gov-api-docs\",\"name\":\"weather.gov API documentation\",\"description\":\"API reference for weather.gov forecast endpoints and required request headers.\",\"mimeType\":\"text/markdown\"}]"
 
 mcp_read_resource! : Str => Str
 mcp_read_resource! = |uri|
-	if uri == "implementation-guidance" {
-		"Use the Roc-defined unit operation data as the source of truth for generated implementation prompts."
-	} else if uri == "progress-tracking" {
-		"MCP tools should tell the LLM to record progress as it makes changes."
+	if uri == "go-language-manual" {
+		"Go programming language manual: https://go.dev/ref/spec\nImplement the weather.gov command-line tool in Go using idiomatic standard-library packages such as bufio, net/http, encoding/json, and fmt."
+	} else if uri == "weather-gov-api-docs" {
+		"weather.gov API documentation: https://api.weather.gov/\nUse weather.gov forecast endpoints and include a descriptive User-Agent header as required by the API."
 	} else {
-		"Unknown resource URI. Available data is defined in platform/ReferenceInformation.roc."
+		"Unknown resource URI. Available code-specific references are go-language-manual and weather-gov-api-docs."
 	}
 
 mcp_prompts! : {} => Str

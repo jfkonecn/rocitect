@@ -161,6 +161,9 @@ const McpProviders = struct {
     write_implementation_targets: *const fn (*std.Io.Writer) anyerror!void,
 };
 
+const builtin_status_resource_json = "{\"uri\":\"rocitect://references/status-updates\",\"name\":\"Status update guidance\",\"description\":\"Host response status behavior to preserve when changing MCP code.\",\"mimeType\":\"text/plain\"}";
+const builtin_status_resource_text = "Status update guidance from src/host.zig: malformed JSON returns HTTP 400 with JSON-RPC parse error -32700; supported JSON-RPC methods return HTTP 200; unknown methods return -32601; unknown tools return -32602. Preserve these statuses when updating MCP endpoint behavior.";
+
 fn writeMcpEndpointMetadata(writer: *std.Io.Writer) !void {
     try writer.writeAll("{\"name\":\"rocitect\",\"endpoint\":\"/mcp\",\"transport\":\"streamable-http\"}");
 }
@@ -196,7 +199,7 @@ fn writeMcpJsonRpcResponse(arena: std.mem.Allocator, writer: *std.Io.Writer, bod
     } else if (std.mem.eql(u8, method, "resources/list")) {
         try writeJsonRpcResultPrefix(writer, id);
         try writer.writeAll("{\"resources\":");
-        try providers.write_resources(writer);
+        try writeMcpResourcesWithBuiltins(arena, writer, providers);
         try writer.writeAll("}");
         try writeJsonRpcResultSuffix(writer);
     } else if (std.mem.eql(u8, method, "resources/read")) {
@@ -206,7 +209,11 @@ fn writeMcpJsonRpcResponse(arena: std.mem.Allocator, writer: *std.Io.Writer, bod
         try writer.writeAll("{\"contents\":[{\"uri\":");
         try writeJsonString(writer, uri);
         try writer.writeAll(",\"mimeType\":\"text/plain\",\"text\":");
-        try providers.write_resource_content(resource_key, writer);
+        if (std.mem.eql(u8, resource_key, "status-updates")) {
+            try writeJsonString(writer, builtin_status_resource_text);
+        } else {
+            try providers.write_resource_content(resource_key, writer);
+        }
         try writer.writeAll("}]}");
         try writeJsonRpcResultSuffix(writer);
     } else if (std.mem.eql(u8, method, "prompts/list")) {
@@ -245,6 +252,28 @@ fn writeMcpJsonRpcResponse(arena: std.mem.Allocator, writer: *std.Io.Writer, bod
     }
 
     return .ok;
+}
+
+fn writeMcpResourcesWithBuiltins(arena: std.mem.Allocator, writer: *std.Io.Writer, providers: McpProviders) !void {
+    var app_resources: std.Io.Writer.Allocating = .init(arena);
+    try providers.write_resources(&app_resources.writer);
+
+    const app_json = std.mem.trim(u8, app_resources.written(), " \n\r\t");
+    if (std.mem.eql(u8, app_json, "[]")) {
+        try writer.writeAll("[");
+        try writer.writeAll(builtin_status_resource_json);
+        return writer.writeAll("]");
+    }
+
+    if (app_json.len >= 2 and app_json[0] == '[' and app_json[app_json.len - 1] == ']') {
+        try writer.writeAll("[");
+        try writer.writeAll(builtin_status_resource_json);
+        try writer.writeAll(",");
+        try writer.writeAll(app_json[1 .. app_json.len - 1]);
+        return writer.writeAll("]");
+    }
+
+    return error.InvalidMcpResources;
 }
 
 fn rocMcpProviders() McpProviders {
@@ -300,6 +329,9 @@ fn getStringParam(params: ?std.json.Value, name: []const u8) ?[]const u8 {
 fn resourceKey(uri: []const u8) []const u8 {
     if (std.mem.eql(u8, uri, "rocitect://references/implementation-guidance")) return "implementation-guidance";
     if (std.mem.eql(u8, uri, "rocitect://references/progress-tracking")) return "progress-tracking";
+    if (std.mem.eql(u8, uri, "rocitect://references/go-language-manual")) return "go-language-manual";
+    if (std.mem.eql(u8, uri, "rocitect://references/weather-gov-api-docs")) return "weather-gov-api-docs";
+    if (std.mem.eql(u8, uri, "rocitect://references/status-updates")) return "status-updates";
     return "unknown";
 }
 
@@ -465,7 +497,14 @@ test "MCP endpoint initialize returns protocol capabilities" {
 test "MCP endpoint resources/list returns Roc resources" {
     try expectMcpResponseContains(
         "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"resources/list\"}",
-        "\"resources\":[{\"uri\":\"rocitect://references/implementation-guidance\"",
+        "\"uri\":\"rocitect://references/implementation-guidance\"",
+    );
+}
+
+test "MCP endpoint resources/list always includes status update guidance" {
+    try expectMcpResponseContains(
+        "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"resources/list\"}",
+        "\"uri\":\"rocitect://references/status-updates\"",
     );
 }
 
@@ -473,6 +512,13 @@ test "MCP endpoint resources/read returns selected resource content" {
     try expectMcpResponseContains(
         "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"resources/read\",\"params\":{\"uri\":\"rocitect://references/implementation-guidance\"}}",
         "\"text\":\"Use the implementation guidance.\"",
+    );
+}
+
+test "MCP endpoint resources/read returns host-owned status update guidance" {
+    try expectMcpResponseContains(
+        "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"resources/read\",\"params\":{\"uri\":\"rocitect://references/status-updates\"}}",
+        "malformed JSON returns HTTP 400",
     );
 }
 
