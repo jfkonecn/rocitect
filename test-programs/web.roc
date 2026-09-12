@@ -62,7 +62,7 @@ functionToImplement = {
 	functionName: "GetWeatherForecast",
 	inputs: [],
 	output: NoOutput,
-	codeComments: Comments("Command line tool that asks for a location, fetches forecast data from weather.gov, and prints a readable forecast."),
+	codeComments: Comments("Write this as a Go command-line tool. It should ask for a location, fetch forecast data from weather.gov, and print a readable forecast."),
 	unitOperations: [
 		InputOutput({
 			input: inputVariable,

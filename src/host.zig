@@ -133,9 +133,7 @@ fn mcpEndpoint(req: *httpz.Request, res: *httpz.Response) !void {
     if (req.method != .POST) {
         res.content_type = .JSON;
         res.header("Cache-Control", "no-cache");
-        try res.writer().writeAll(
-            "{\"name\":\"rocitect\",\"endpoint\":\"/mcp\",\"transport\":\"streamable-http\"}",
-        );
+        try writeMcpEndpointMetadata(res.writer());
         return;
     }
 
@@ -148,91 +146,147 @@ fn mcpEndpoint(req: *httpz.Request, res: *httpz.Response) !void {
         try body.writer.writeAll(buffer[0..read]);
     }
 
-    var parsed = std.json.parseFromSlice(std.json.Value, res.arena, body.written(), .{}) catch {
-        res.setStatus(.bad_request);
-        res.content_type = .JSON;
-        try res.writer().writeAll("{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32700,\"message\":\"Parse error\"}}");
-        return;
+    res.content_type = .JSON;
+    res.header("Cache-Control", "no-cache");
+
+    const status = try writeMcpJsonRpcResponse(res.arena, res.writer(), body.written(), rocMcpProviders());
+    res.status = @intFromEnum(status);
+}
+
+const McpProviders = struct {
+    write_resources: *const fn (*std.Io.Writer) anyerror!void,
+    write_resource_content: *const fn ([]const u8, *std.Io.Writer) anyerror!void,
+    write_prompts: *const fn (*std.Io.Writer) anyerror!void,
+    write_prompt: *const fn ([]const u8, *std.Io.Writer) anyerror!void,
+    write_implementation_targets: *const fn (*std.Io.Writer) anyerror!void,
+};
+
+fn writeMcpEndpointMetadata(writer: *std.Io.Writer) !void {
+    try writer.writeAll("{\"name\":\"rocitect\",\"endpoint\":\"/mcp\",\"transport\":\"streamable-http\"}");
+}
+
+fn writeMcpJsonRpcResponse(arena: std.mem.Allocator, writer: *std.Io.Writer, body: []const u8, providers: McpProviders) !std.http.Status {
+    var parsed = std.json.parseFromSlice(std.json.Value, arena, body, .{}) catch {
+        try writer.writeAll("{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32700,\"message\":\"Parse error\"}}");
+        return .bad_request;
     };
     defer parsed.deinit();
 
     if (parsed.value != .object) {
-        return writeJsonRpcError(res, .null, -32600, "Invalid request");
+        try writeJsonRpcError(writer, .null, -32600, "Invalid request");
+        return .ok;
     }
 
     const request = parsed.value.object;
     const id: std.json.Value = request.get("id") orelse .null;
-    const method_value = request.get("method") orelse return writeJsonRpcError(res, id, -32600, "Missing method");
-    if (method_value != .string) return writeJsonRpcError(res, id, -32600, "Invalid method");
-
-    res.content_type = .JSON;
-    res.header("Cache-Control", "no-cache");
+    const method_value = request.get("method") orelse {
+        try writeJsonRpcError(writer, id, -32600, "Missing method");
+        return .ok;
+    };
+    if (method_value != .string) {
+        try writeJsonRpcError(writer, id, -32600, "Invalid method");
+        return .ok;
+    }
 
     const method = method_value.string;
     if (std.mem.eql(u8, method, "initialize")) {
-        try writeJsonRpcResultPrefix(res.writer(), id);
-        try res.writer().writeAll("{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{\"resources\":{},\"prompts\":{},\"tools\":{}},\"serverInfo\":{\"name\":\"rocitect\",\"version\":\"0.1.0\"}}");
-        return writeJsonRpcResultSuffix(res.writer());
+        try writeJsonRpcResultPrefix(writer, id);
+        try writer.writeAll("{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{\"resources\":{},\"prompts\":{},\"tools\":{}},\"serverInfo\":{\"name\":\"rocitect\",\"version\":\"0.1.0\"}}");
+        try writeJsonRpcResultSuffix(writer);
     } else if (std.mem.eql(u8, method, "resources/list")) {
-        var resources = abi.roc_mcp_resources();
-        defer resources.decref(g_roc_host.?);
-        try writeJsonRpcResultPrefix(res.writer(), id);
-        try res.writer().print("{{\"resources\":{s}}}", .{resources.asSlice()});
-        return writeJsonRpcResultSuffix(res.writer());
+        try writeJsonRpcResultPrefix(writer, id);
+        try writer.writeAll("{\"resources\":");
+        try providers.write_resources(writer);
+        try writer.writeAll("}");
+        try writeJsonRpcResultSuffix(writer);
     } else if (std.mem.eql(u8, method, "resources/read")) {
         const uri = getStringParam(request.get("params"), "uri") orelse "unknown";
         const resource_key = resourceKey(uri);
-        const roc_key = abi.RocStr.fromSlice(resource_key, g_roc_host.?);
-        var content = abi.roc_mcp_read_resource(roc_key);
-        defer content.decref(g_roc_host.?);
-        try writeJsonRpcResultPrefix(res.writer(), id);
-        try res.writer().writeAll("{\"contents\":[{\"uri\":");
-        try writeJsonString(res.writer(), uri);
-        try res.writer().writeAll(",\"mimeType\":\"text/plain\",\"text\":");
-        try writeJsonString(res.writer(), content.asSlice());
-        try res.writer().writeAll("}]}");
-        return writeJsonRpcResultSuffix(res.writer());
+        try writeJsonRpcResultPrefix(writer, id);
+        try writer.writeAll("{\"contents\":[{\"uri\":");
+        try writeJsonString(writer, uri);
+        try writer.writeAll(",\"mimeType\":\"text/plain\",\"text\":");
+        try providers.write_resource_content(resource_key, writer);
+        try writer.writeAll("}]}");
+        try writeJsonRpcResultSuffix(writer);
     } else if (std.mem.eql(u8, method, "prompts/list")) {
-        var prompts = abi.roc_mcp_prompts();
-        defer prompts.decref(g_roc_host.?);
-        try writeJsonRpcResultPrefix(res.writer(), id);
-        try res.writer().print("{{\"prompts\":{s}}}", .{prompts.asSlice()});
-        return writeJsonRpcResultSuffix(res.writer());
+        try writeJsonRpcResultPrefix(writer, id);
+        try writer.writeAll("{\"prompts\":");
+        try providers.write_prompts(writer);
+        try writer.writeAll("}");
+        try writeJsonRpcResultSuffix(writer);
     } else if (std.mem.eql(u8, method, "prompts/get")) {
         const name = getStringParam(request.get("params"), "name") orelse "implement-function";
         const prompt_name = if (std.mem.eql(u8, name, "implement-test-suite")) "implement-test-suite" else "implement-function";
-        const roc_name = abi.RocStr.fromSlice(prompt_name, g_roc_host.?);
-        var prompt = abi.roc_mcp_prompt(roc_name);
-        defer prompt.decref(g_roc_host.?);
-        try writeJsonRpcResultPrefix(res.writer(), id);
-        try res.writer().writeAll("{\"description\":");
-        try writeJsonString(res.writer(), prompt_name);
-        try res.writer().writeAll(",\"messages\":[{\"role\":\"user\",\"content\":{\"type\":\"text\",\"text\":");
-        try writeJsonString(res.writer(), prompt.asSlice());
-        try res.writer().writeAll("}}]}");
-        return writeJsonRpcResultSuffix(res.writer());
+        try writeJsonRpcResultPrefix(writer, id);
+        try writer.writeAll("{\"description\":");
+        try writeJsonString(writer, prompt_name);
+        try writer.writeAll(",\"messages\":[{\"role\":\"user\",\"content\":{\"type\":\"text\",\"text\":");
+        try providers.write_prompt(prompt_name, writer);
+        try writer.writeAll("}}]}");
+        try writeJsonRpcResultSuffix(writer);
     } else if (std.mem.eql(u8, method, "tools/list")) {
-        // TODO: Tell the LLM to record its progress as it makes changes.
-        // TODO: Reuse this data model so the website can save the same function, test suite, prompt, and reference data if needed.
-        // TODO: Add Roc code to generate website pages based on the defined functions.
-        try writeJsonRpcResultPrefix(res.writer(), id);
-        try res.writer().writeAll("{\"tools\":[{\"name\":\"list_implementation_targets\",\"description\":\"List available functions and test suites to implement.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{}}}]}");
-        return writeJsonRpcResultSuffix(res.writer());
+        try writeJsonRpcResultPrefix(writer, id);
+        try writer.writeAll("{\"tools\":[{\"name\":\"list_implementation_targets\",\"description\":\"List available functions and test suites to implement.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{}}}]}");
+        try writeJsonRpcResultSuffix(writer);
     } else if (std.mem.eql(u8, method, "tools/call")) {
         const name = getStringParam(request.get("params"), "name") orelse "";
         if (!std.mem.eql(u8, name, "list_implementation_targets")) {
-            return writeJsonRpcError(res, id, -32602, "Unknown tool");
+            try writeJsonRpcError(writer, id, -32602, "Unknown tool");
+            return .ok;
         }
-        var targets = abi.roc_mcp_implementation_targets();
-        defer targets.decref(g_roc_host.?);
-        try writeJsonRpcResultPrefix(res.writer(), id);
-        try res.writer().writeAll("{\"content\":[{\"type\":\"text\",\"text\":");
-        try writeJsonString(res.writer(), targets.asSlice());
-        try res.writer().writeAll("}]}");
-        return writeJsonRpcResultSuffix(res.writer());
+        try writeJsonRpcResultPrefix(writer, id);
+        try writer.writeAll("{\"content\":[{\"type\":\"text\",\"text\":");
+        try providers.write_implementation_targets(writer);
+        try writer.writeAll("}]}");
+        try writeJsonRpcResultSuffix(writer);
+    } else {
+        try writeJsonRpcError(writer, id, -32601, "Method not found");
     }
 
-    return writeJsonRpcError(res, id, -32601, "Method not found");
+    return .ok;
+}
+
+fn rocMcpProviders() McpProviders {
+    return .{
+        .write_resources = writeRocMcpResources,
+        .write_resource_content = writeRocMcpResourceContent,
+        .write_prompts = writeRocMcpPrompts,
+        .write_prompt = writeRocMcpPrompt,
+        .write_implementation_targets = writeRocMcpImplementationTargets,
+    };
+}
+
+fn writeRocMcpResources(writer: *std.Io.Writer) !void {
+    var resources = abi.roc_mcp_resources();
+    defer resources.decref(g_roc_host.?);
+    try writer.writeAll(resources.asSlice());
+}
+
+fn writeRocMcpResourceContent(resource_key: []const u8, writer: *std.Io.Writer) !void {
+    const roc_key = abi.RocStr.fromSlice(resource_key, g_roc_host.?);
+    var content = abi.roc_mcp_read_resource(roc_key);
+    defer content.decref(g_roc_host.?);
+    try writeJsonString(writer, content.asSlice());
+}
+
+fn writeRocMcpPrompts(writer: *std.Io.Writer) !void {
+    var prompts = abi.roc_mcp_prompts();
+    defer prompts.decref(g_roc_host.?);
+    try writer.writeAll(prompts.asSlice());
+}
+
+fn writeRocMcpPrompt(prompt_name: []const u8, writer: *std.Io.Writer) !void {
+    const roc_name = abi.RocStr.fromSlice(prompt_name, g_roc_host.?);
+    var prompt = abi.roc_mcp_prompt(roc_name);
+    defer prompt.decref(g_roc_host.?);
+    try writeJsonString(writer, prompt.asSlice());
+}
+
+fn writeRocMcpImplementationTargets(writer: *std.Io.Writer) !void {
+    var targets = abi.roc_mcp_implementation_targets();
+    defer targets.decref(g_roc_host.?);
+    try writeJsonString(writer, targets.asSlice());
 }
 
 fn getStringParam(params: ?std.json.Value, name: []const u8) ?[]const u8 {
@@ -249,10 +303,7 @@ fn resourceKey(uri: []const u8) []const u8 {
     return "unknown";
 }
 
-fn writeJsonRpcError(res: *httpz.Response, id: std.json.Value, code: i32, message: []const u8) !void {
-    res.content_type = .JSON;
-    res.header("Cache-Control", "no-cache");
-    const writer = res.writer();
+fn writeJsonRpcError(writer: *std.Io.Writer, id: std.json.Value, code: i32, message: []const u8) !void {
     try writer.writeAll("{\"jsonrpc\":\"2.0\",\"id\":");
     try std.json.Stringify.value(id, .{}, writer);
     try writer.print(",\"error\":{{\"code\":{},\"message\":", .{code});
@@ -336,6 +387,147 @@ test "asset URLs are safe flat JavaScript or CSS paths" {
     try std.testing.expect(!isAssetUrl("/assets/nested/feature-a.js"));
     try std.testing.expect(!isAssetUrl("/assets/feature-a.js.map"));
     try std.testing.expect(!isAssetUrl("/assets/feature-a.js\""));
+}
+
+const test_mcp_providers = McpProviders{
+    .write_resources = writeTestMcpResources,
+    .write_resource_content = writeTestMcpResourceContent,
+    .write_prompts = writeTestMcpPrompts,
+    .write_prompt = writeTestMcpPrompt,
+    .write_implementation_targets = writeTestMcpImplementationTargets,
+};
+
+fn writeTestMcpResources(writer: *std.Io.Writer) !void {
+    try writer.writeAll("[{\"uri\":\"rocitect://references/implementation-guidance\",\"name\":\"Implementation guidance\"}]");
+}
+
+fn writeTestMcpResourceContent(resource_key: []const u8, writer: *std.Io.Writer) !void {
+    if (std.mem.eql(u8, resource_key, "implementation-guidance")) {
+        return writeJsonString(writer, "Use the implementation guidance.");
+    }
+    try writeJsonString(writer, "Unknown resource.");
+}
+
+fn writeTestMcpPrompts(writer: *std.Io.Writer) !void {
+    try writer.writeAll("[{\"name\":\"implement-function\"},{\"name\":\"implement-test-suite\"}]");
+}
+
+fn writeTestMcpPrompt(prompt_name: []const u8, writer: *std.Io.Writer) !void {
+    if (std.mem.eql(u8, prompt_name, "implement-test-suite")) {
+        return writeJsonString(writer, "Write tests for the target function.");
+    }
+    try writeJsonString(writer, "Implement the target function.");
+}
+
+fn writeTestMcpImplementationTargets(writer: *std.Io.Writer) !void {
+    try writeJsonString(writer, "Available functions to implement:\n- function:get-weather-forecast GetWeatherForecast");
+}
+
+fn testMcpResponse(body: []const u8) !struct { status: std.http.Status, body: []const u8 } {
+    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+    errdefer arena_state.deinit();
+
+    var out: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    errdefer out.deinit();
+
+    const status = try writeMcpJsonRpcResponse(arena_state.allocator(), &out.writer, body, test_mcp_providers);
+    arena_state.deinit();
+    return .{ .status = status, .body = try out.toOwnedSlice() };
+}
+
+fn expectMcpResponseContains(body: []const u8, expected: []const u8) !void {
+    const response = try testMcpResponse(body);
+    defer std.testing.allocator.free(response.body);
+
+    try std.testing.expectEqual(std.http.Status.ok, response.status);
+    try std.testing.expect(std.mem.containsAtLeast(u8, response.body, 1, expected));
+}
+
+test "MCP endpoint metadata describes the streamable HTTP endpoint" {
+    var out: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer out.deinit();
+
+    try writeMcpEndpointMetadata(&out.writer);
+
+    try std.testing.expectEqualStrings(
+        "{\"name\":\"rocitect\",\"endpoint\":\"/mcp\",\"transport\":\"streamable-http\"}",
+        out.written(),
+    );
+}
+
+test "MCP endpoint initialize returns protocol capabilities" {
+    try expectMcpResponseContains(
+        "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\"}",
+        "\"capabilities\":{\"resources\":{},\"prompts\":{},\"tools\":{}}",
+    );
+}
+
+test "MCP endpoint resources/list returns Roc resources" {
+    try expectMcpResponseContains(
+        "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"resources/list\"}",
+        "\"resources\":[{\"uri\":\"rocitect://references/implementation-guidance\"",
+    );
+}
+
+test "MCP endpoint resources/read returns selected resource content" {
+    try expectMcpResponseContains(
+        "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"resources/read\",\"params\":{\"uri\":\"rocitect://references/implementation-guidance\"}}",
+        "\"text\":\"Use the implementation guidance.\"",
+    );
+}
+
+test "MCP endpoint prompts/list returns Roc prompts" {
+    try expectMcpResponseContains(
+        "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"prompts/list\"}",
+        "\"prompts\":[{\"name\":\"implement-function\"}",
+    );
+}
+
+test "MCP endpoint prompts/get returns function prompt by default" {
+    try expectMcpResponseContains(
+        "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"prompts/get\",\"params\":{\"name\":\"implement-function\"}}",
+        "\"text\":\"Implement the target function.\"",
+    );
+}
+
+test "MCP endpoint prompts/get returns test suite prompt" {
+    try expectMcpResponseContains(
+        "{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"prompts/get\",\"params\":{\"name\":\"implement-test-suite\"}}",
+        "\"description\":\"implement-test-suite\"",
+    );
+}
+
+test "MCP endpoint tools/list returns implementation target tool" {
+    try expectMcpResponseContains(
+        "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/list\"}",
+        "\"name\":\"list_implementation_targets\"",
+    );
+}
+
+test "MCP endpoint tools/call returns implementation targets" {
+    try expectMcpResponseContains(
+        "{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"tools/call\",\"params\":{\"name\":\"list_implementation_targets\"}}",
+        "function:get-weather-forecast GetWeatherForecast",
+    );
+}
+
+test "MCP endpoint rejects malformed JSON" {
+    const response = try testMcpResponse("{");
+    defer std.testing.allocator.free(response.body);
+
+    try std.testing.expectEqual(std.http.Status.bad_request, response.status);
+    try std.testing.expect(std.mem.containsAtLeast(u8, response.body, 1, "\"code\":-32700"));
+}
+
+test "MCP endpoint rejects unknown methods and tools" {
+    try expectMcpResponseContains(
+        "{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"unknown/method\"}",
+        "\"code\":-32601",
+    );
+    try expectMcpResponseContains(
+        "{\"jsonrpc\":\"2.0\",\"id\":10,\"method\":\"tools/call\",\"params\":{\"name\":\"unknown_tool\"}}",
+        "\"code\":-32602",
+    );
 }
 
 fn hostAlloc(length: usize, alignment: usize) callconv(.c) ?*anyopaque {
