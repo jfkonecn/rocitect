@@ -990,7 +990,7 @@ pub fn makeRocHost(env: *RocEnv) RocHost {
 // =============================================================================
 
 /// Entrypoint: plan_page_for_host!
-pub extern fn roc_plan_page() callconv(.c) RocStr;
+pub extern fn roc_plan_page(arg0: RocStr, arg1: RocStr) callconv(.c) RocStr;
 
 /// Entrypoint: mcp_resources_for_host!
 pub extern fn roc_mcp_resources() callconv(.c) RocStr;

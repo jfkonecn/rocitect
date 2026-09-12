@@ -1,14 +1,15 @@
-class BlueprintComponent extends HTMLElement {
-	connectedCallback() {
-		if (this.shadowRoot) return;
+import { BlueprintComponent } from "./blueprint";
+import { BlueprintDataConnection } from "./data-connection";
+import { BlueprintFunctionNode } from "./function-node";
 
-		this.attachShadow({ mode: "open" }).innerHTML = `
-        <style>
-          p { color: royalblue; font-family: system-ui; }
-        </style>
-        <p>Hello, world!</p>
-      `;
-	}
+if (!customElements.get("rocitect-function-node")) {
+	customElements.define("rocitect-function-node", BlueprintFunctionNode);
 }
 
-customElements.define("rocitect-blueprint", BlueprintComponent);
+if (!customElements.get("rocitect-data-connection")) {
+	customElements.define("rocitect-data-connection", BlueprintDataConnection);
+}
+
+if (!customElements.get("rocitect-blueprint")) {
+	customElements.define("rocitect-blueprint", BlueprintComponent);
+}

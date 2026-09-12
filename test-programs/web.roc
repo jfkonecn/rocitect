@@ -9,10 +9,11 @@ app [
 
 import pf.PromptGeneration
 import pf.ReferenceInformation
+import pf.BlueprintGeneration
 import pf.UnitOperations
 
-plan_page! : {} => Str
-plan_page! = |_| "<h1>Roc page</h1><rocitect-blueprint></rocitect-blueprint>"
+plan_page! : Str, Str => Str
+plan_page! = |kind, id| BlueprintGeneration.generateBlueprintPage(kind, id, [functionToImplement])
 
 referenceItems : List(ReferenceInformation.ReferenceItem({}, {}))
 referenceItems = [
@@ -38,24 +39,81 @@ stringType : UnitOperations.TypeDefinition({}, {})
 stringType = Primitive({ primitiveType: String })
 
 inputVariable : UnitOperations.VariableDefinition({}, {})
-inputVariable = { name: "rawName", typeDefinition: stringType }
+inputVariable = { name: "locationInput", typeDefinition: stringType }
 
-outputVariable : UnitOperations.VariableDefinition({}, {})
-outputVariable = { name: "normalizedName", typeDefinition: stringType }
+validatedLocationVariable : UnitOperations.VariableDefinition({}, {})
+validatedLocationVariable = { name: "validatedLocation", typeDefinition: stringType }
+
+apiResponseVariable : UnitOperations.VariableDefinition({}, {})
+apiResponseVariable = { name: "weatherGovResponse", typeDefinition: stringType }
+
+parsedWeatherVariable : UnitOperations.VariableDefinition({}, {})
+parsedWeatherVariable = { name: "parsedWeatherJson", typeDefinition: stringType }
+
+forecastTextVariable : UnitOperations.VariableDefinition({}, {})
+forecastTextVariable = { name: "forecastText", typeDefinition: stringType }
+
+errorVariable : UnitOperations.VariableDefinition({}, {})
+errorVariable = { name: "weatherError", typeDefinition: stringType }
 
 functionToImplement : UnitOperations.FunctionDefinition({}, {}, {}, U64, Str)
 functionToImplement = {
-	id: "function:normalize-name",
-	functionName: "NormalizeName",
-	inputs: [inputVariable],
-	output: Output(stringType),
-	codeComments: Comments("Return a display-safe name."),
+	id: "function:get-weather-forecast",
+	functionName: "GetWeatherForecast",
+	inputs: [],
+	output: NoOutput,
+	codeComments: Comments("Command line tool that asks for a location, fetches forecast data from weather.gov, and prints a readable forecast."),
 	unitOperations: [
-		Map({
+		InputOutput({
 			input: inputVariable,
-			output: outputVariable,
-			functionCalls: [{ id: "function:trim", functionName: "TrimWhitespace" }],
-			codeComments: Comments("Trim whitespace before returning."),
+			inputOutputLogic: InputOutputDescription("Ask the user what location they want weather data for."),
+			successOutput: inputVariable,
+			failureOutput: errorVariable,
+			functionCalls: [],
+			codeComments: Comments("Prompt on stdin/stdout for a location such as city/state or latitude/longitude."),
+			performanceEstimate: [{ value: 1, unit: "interaction" }],
+		}),
+		Validate({
+			input: inputVariable,
+			validationLogic: ValidationDescription("Ensure the location input is present and specific enough to resolve for weather.gov."),
+			successOutput: validatedLocationVariable,
+			failureOutput: errorVariable,
+			functionCalls: [],
+			codeComments: Comments("Reject empty or ambiguous input before making a network request."),
+			performanceEstimate: [{ value: 1, unit: "millisecond" }],
+		}),
+		InputOutput({
+			input: validatedLocationVariable,
+			inputOutputLogic: InputOutputDescription("Make a GET request to the weather.gov API endpoint for the requested location."),
+			successOutput: apiResponseVariable,
+			failureOutput: errorVariable,
+			functionCalls: [{ id: "function:http-get", functionName: "HttpGet" }],
+			codeComments: Comments("Use weather.gov endpoints and include a User-Agent header as required by the API."),
+			performanceEstimate: [{ value: 500, unit: "millisecond" }],
+		}),
+		Validate({
+			input: apiResponseVariable,
+			validationLogic: ValidationDescription("Parse and validate the JSON response from weather.gov."),
+			successOutput: parsedWeatherVariable,
+			failureOutput: errorVariable,
+			functionCalls: [{ id: "function:parse-json", functionName: "ParseJson" }],
+			codeComments: Comments("Confirm the response contains forecast periods before formatting output."),
+			performanceEstimate: [{ value: 2, unit: "millisecond" }],
+		}),
+		Map({
+			input: parsedWeatherVariable,
+			output: forecastTextVariable,
+			functionCalls: [{ id: "function:format-forecast", functionName: "FormatForecast" }],
+			codeComments: Comments("Convert the parsed JSON data into a concise human-readable forecast string."),
+			performanceEstimate: [{ value: 1, unit: "millisecond" }],
+		}),
+		InputOutput({
+			input: forecastTextVariable,
+			inputOutputLogic: InputOutputDescription("Print the forecast string to the console."),
+			successOutput: forecastTextVariable,
+			failureOutput: errorVariable,
+			functionCalls: [],
+			codeComments: Comments("Write the formatted forecast to stdout."),
 			performanceEstimate: [{ value: 1, unit: "millisecond" }],
 		}),
 	],
@@ -63,10 +121,13 @@ functionToImplement = {
 
 testSuiteToImplement : UnitOperations.TestSuite({}, {}, {}, U64, Str)
 testSuiteToImplement = {
-	id: "test:normalize-name",
-	name: "NormalizeName Tests",
+	id: "test:get-weather-forecast",
+	name: "GetWeatherForecast Tests",
 	functionDefinition: functionToImplement,
-	testCases: [{ name: "trims spaces", description: "Returns the input without surrounding whitespace." }],
+	testCases: [
+		{ name: "rejects empty location", description: "Shows a validation error when the user does not enter a usable location." },
+		{ name: "formats forecast response", description: "Converts a successful weather.gov JSON response into readable console text." },
+	],
 }
 
 mcp_resources! : {} => Str
@@ -97,4 +158,4 @@ mcp_prompt! = |name|
 
 mcp_implementation_targets! : {} => Str
 mcp_implementation_targets! = |_|
-	"Available functions to implement:\n- function:normalize-name NormalizeName\n\nAvailable test suites to implement:\n- test:normalize-name NormalizeName Tests"
+	"Available functions to implement:\n- function:get-weather-forecast GetWeatherForecast\n\nAvailable test suites to implement:\n- test:get-weather-forecast GetWeatherForecast Tests"

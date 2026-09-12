@@ -1,13 +1,13 @@
 platform ""
 	requires {
-		plan_page! : {} => Str,
+		plan_page! : Str, Str => Str,
 		mcp_resources! : {} => Str,
 		mcp_read_resource! : Str => Str,
 		mcp_prompts! : {} => Str,
 		mcp_prompt! : Str => Str,
-		mcp_implementation_targets! : {} => Str,
+		mcp_implementation_targets! : {} => Str
 	}
-	exposes [ReferenceInformation, PromptGeneration, UnitOperations]
+	exposes [BlueprintGeneration, ReferenceInformation, PromptGeneration, UnitOperations]
 	packages {}
 	provides {
 		"roc_plan_page": plan_page_for_host!,
@@ -28,11 +28,12 @@ platform ""
 	}
 
 import ReferenceInformation exposing [ReferenceInformation]
+import BlueprintGeneration exposing [BlueprintGeneration]
 import PromptGeneration exposing [PromptGeneration]
 import UnitOperations exposing [UnitOperations]
 
-plan_page_for_host! : {} => Str
-plan_page_for_host! = |_| plan_page!({})
+plan_page_for_host! : Str, Str => Str
+plan_page_for_host! = |kind, id| plan_page!(kind, id)
 
 mcp_resources_for_host! : {} => Str
 mcp_resources_for_host! = |_| mcp_resources!({})

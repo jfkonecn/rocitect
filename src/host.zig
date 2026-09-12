@@ -64,9 +64,15 @@ fn initZigTls() void {
     }
 }
 
-fn planPage(_: *httpz.Request, res: *httpz.Response) !void {
+fn planPage(req: *httpz.Request, res: *httpz.Response) !void {
     const roc_host = g_roc_host.?;
-    var html = abi.roc_plan_page();
+    const query = try req.query();
+    const kind = query.get("kind") orelse "";
+    const id = query.get("id") orelse "";
+    var html = abi.roc_plan_page(
+        abi.RocStr.fromSlice(kind, roc_host),
+        abi.RocStr.fromSlice(id, roc_host),
+    );
     defer html.decref(roc_host);
 
     res.content_type = .HTML;
@@ -248,7 +254,7 @@ fn writeJsonRpcError(res: *httpz.Response, id: std.json.Value, code: i32, messag
     res.header("Cache-Control", "no-cache");
     const writer = res.writer();
     try writer.writeAll("{\"jsonrpc\":\"2.0\",\"id\":");
-    try std.json.stringify(id, .{}, writer);
+    try std.json.Stringify.value(id, .{}, writer);
     try writer.print(",\"error\":{{\"code\":{},\"message\":", .{code});
     try writeJsonString(writer, message);
     try writer.writeAll("}}");
@@ -256,7 +262,7 @@ fn writeJsonRpcError(res: *httpz.Response, id: std.json.Value, code: i32, messag
 
 fn writeJsonRpcResultPrefix(writer: anytype, id: std.json.Value) !void {
     try writer.writeAll("{\"jsonrpc\":\"2.0\",\"id\":");
-    try std.json.stringify(id, .{}, writer);
+    try std.json.Stringify.value(id, .{}, writer);
     try writer.writeAll(",\"result\":");
 }
 
