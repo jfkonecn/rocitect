@@ -125,7 +125,7 @@ export class BlueprintComponent extends HTMLElement {
 
 				.details-link {
 					display: inline-flex;
-					margin-top: 1rem;
+					margin: 1rem 0.5rem 0 0;
 					padding: 0.5rem 0.7rem;
 					border-radius: 999px;
 					background: #2563eb;
@@ -177,7 +177,8 @@ export class BlueprintComponent extends HTMLElement {
 						<h2 class="details-title"></h2>
 						<p class="details-id"></p>
 						<p class="details-body"></p>
-						<a class="details-link" hidden>View unit operations</a>
+						<a class="details-link primary-link" hidden></a>
+						<a class="details-link secondary-link" hidden></a>
 					</aside>
 				</div>
 			</section>
@@ -209,8 +210,20 @@ export class BlueprintComponent extends HTMLElement {
 		const title = shadowRoot.querySelector<HTMLElement>(".details-title");
 		const id = shadowRoot.querySelector<HTMLElement>(".details-id");
 		const body = shadowRoot.querySelector<HTMLElement>(".details-body");
-		const link = shadowRoot.querySelector<HTMLAnchorElement>(".details-link");
-		if (!details || !kind || !title || !id || !body || !link) return;
+		const primaryLink =
+			shadowRoot.querySelector<HTMLAnchorElement>(".primary-link");
+		const secondaryLink =
+			shadowRoot.querySelector<HTMLAnchorElement>(".secondary-link");
+		if (
+			!details ||
+			!kind ||
+			!title ||
+			!id ||
+			!body ||
+			!primaryLink ||
+			!secondaryLink
+		)
+			return;
 
 		details.hidden = false;
 		kind.textContent = node.getAttribute("detail-kind") ?? "Blueprint item";
@@ -225,7 +238,15 @@ export class BlueprintComponent extends HTMLElement {
 			"";
 
 		const href = node.getAttribute("detail-href");
-		link.hidden = !href;
-		if (href) link.href = href;
+		primaryLink.hidden = !href;
+		primaryLink.textContent =
+			node.getAttribute("detail-label") ?? "View details";
+		if (href) primaryLink.href = href;
+
+		const secondaryHref = node.getAttribute("detail-secondary-href");
+		secondaryLink.hidden = !secondaryHref;
+		secondaryLink.textContent =
+			node.getAttribute("detail-secondary-label") ?? "View more";
+		if (secondaryHref) secondaryLink.href = secondaryHref;
 	}
 }

@@ -13,7 +13,7 @@ import pf.BlueprintGeneration
 import pf.UnitOperations
 
 plan_page! : Str, Str => Str
-plan_page! = |kind, id| BlueprintGeneration.generateBlueprintPage(kind, id, [functionToImplement])
+plan_page! = |kind, id| BlueprintGeneration.generateBlueprintPage(kind, id, [functionToImplement], [testSuiteToImplement])
 
 referenceItems : List(ReferenceInformation.ReferenceItem({}, {}))
 referenceItems = [

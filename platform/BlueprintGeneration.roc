@@ -89,6 +89,20 @@ BlueprintGeneration := [].{
 	operationDetails : UnitOperations.UnitOperation(customPrimitive, customCollection, customLogic, customPerformanceValue, customPerformanceUnit) -> Str
 	operationDetails = |operation| PromptGeneration.unitOperationToPrompt(operation)
 
+	testSuiteDetails : UnitOperations.TestSuite(customPrimitive, customCollection, customLogic, customPerformanceValue, customPerformanceUnit) -> Str
+	testSuiteDetails = |testSuite| {
+		var $details = "Test suite ID: ${testSuite.id}"
+		$details = appendLine($details, "Function under test: ${testSuite.functionDefinition.functionName} (${testSuite.functionDefinition.id})")
+		appendLine($details, "Test cases: ${testSuite.testCases.len().to_str()}")
+	}
+
+	testCaseDetails : UnitOperations.TestSuite(customPrimitive, customCollection, customLogic, customPerformanceValue, customPerformanceUnit), UnitOperations.TestCase -> Str
+	testCaseDetails = |testSuite, testCase| {
+		var $details = "Test suite: ${testSuite.name} (${testSuite.id})"
+		$details = appendLine($details, "Function under test: ${testSuite.functionDefinition.functionName}")
+		appendLine($details, "Description: ${testCase.description}")
+	}
+
 	functionX : U64 -> Str
 	functionX = |index|
 		if index == 1 {
@@ -157,11 +171,19 @@ BlueprintGeneration := [].{
 
 	functionNodeMarkup : U64, UnitOperations.FunctionDefinition(customPrimitive, customCollection, customLogic, customPerformanceValue, customPerformanceUnit) -> Str
 	functionNodeMarkup = |index, functionDefinition|
-		"<rocitect-function-node${attribute("style", "left: ${functionX(index)}%; top: ${functionY(index)}%;")}${attribute("name", functionDefinition.functionName)}${attribute("description", "${functionDefinition.inputs.len().to_str()} inputs, ${functionDefinition.unitOperations.len().to_str()} unit operations")}${attribute("tone", "transform")}${attribute("detail-title", functionDefinition.functionName)}${attribute("detail-kind", "Function")}${attribute("detail-id", functionDefinition.id)}${attribute("detail-body", functionDetails(functionDefinition))}${attribute("detail-href", "/?kind=function&id=${functionDefinition.id}")}></rocitect-function-node>"
+		"<rocitect-function-node${attribute("style", "left: ${functionX(index)}%; top: ${functionY(index)}%;")}${attribute("name", functionDefinition.functionName)}${attribute("description", "${functionDefinition.inputs.len().to_str()} inputs, ${functionDefinition.unitOperations.len().to_str()} unit operations")}${attribute("tone", "transform")}${attribute("detail-title", functionDefinition.functionName)}${attribute("detail-kind", "Function")}${attribute("detail-id", functionDefinition.id)}${attribute("detail-body", functionDetails(functionDefinition))}${attribute("detail-href", "/?kind=function&id=${functionDefinition.id}")}${attribute("detail-label", "View unit operations")}${attribute("detail-secondary-href", "/?kind=test&id=${functionDefinition.id}")}${attribute("detail-secondary-label", "View tests")}></rocitect-function-node>"
 
 	operationNodeMarkup : Str, U64, UnitOperations.UnitOperation(customPrimitive, customCollection, customLogic, customPerformanceValue, customPerformanceUnit) -> Str
 	operationNodeMarkup = |functionId, index, operation|
 		"<rocitect-function-node${attribute("style", "left: ${operationX(index)}%; top: ${operationY(index)}%;")}${attribute("name", operationKind(operation))}${attribute("description", operationDescription(operation))}${attribute("tone", operationTone(operation))}${attribute("detail-title", operationKind(operation))}${attribute("detail-kind", "Unit operation")}${attribute("detail-id", "unit-operation:${functionId}:${index.to_str()}")}${attribute("detail-body", operationDetails(operation))}></rocitect-function-node>"
+
+	testSuiteNodeMarkup : U64, UnitOperations.TestSuite(customPrimitive, customCollection, customLogic, customPerformanceValue, customPerformanceUnit) -> Str
+	testSuiteNodeMarkup = |index, testSuite|
+		"<rocitect-function-node${attribute("style", "left: ${operationX(index)}%; top: ${operationY(index)}%;")}${attribute("name", testSuite.name)}${attribute("description", "${testSuite.testCases.len().to_str()} test cases")}${attribute("tone", "source")}${attribute("detail-title", testSuite.name)}${attribute("detail-kind", "Test suite")}${attribute("detail-id", testSuite.id)}${attribute("detail-body", testSuiteDetails(testSuite))}></rocitect-function-node>"
+
+	testCaseNodeMarkup : U64, UnitOperations.TestSuite(customPrimitive, customCollection, customLogic, customPerformanceValue, customPerformanceUnit), UnitOperations.TestCase -> Str
+	testCaseNodeMarkup = |index, testSuite, testCase|
+		"<rocitect-function-node${attribute("style", "left: ${operationX(index)}%; top: ${operationY(index)}%;")}${attribute("name", testCase.name)}${attribute("description", testCase.description)}${attribute("tone", "transform")}${attribute("detail-title", testCase.name)}${attribute("detail-kind", "Test case")}${attribute("detail-id", "test-case:${testSuite.id}:${index.to_str()}")}${attribute("detail-body", testCaseDetails(testSuite, testCase))}></rocitect-function-node>"
 
 	functionFlowMarkup : List(UnitOperations.FunctionDefinition(customPrimitive, customCollection, customLogic, customPerformanceValue, customPerformanceUnit)) -> Str
 	functionFlowMarkup = |functionDefinitions| {
@@ -211,6 +233,42 @@ BlueprintGeneration := [].{
 		Str.concat($markup, "</rocitect-blueprint>")
 	}
 
+	testFlowMarkup : Str, List(UnitOperations.TestSuite(customPrimitive, customCollection, customLogic, customPerformanceValue, customPerformanceUnit)) -> Str
+	testFlowMarkup = |functionId, testSuites| {
+		var $markup = "<rocitect-blueprint>"
+		var $index = 1
+		var $previousX = ""
+		var $previousY = ""
+
+		for testSuite in testSuites {
+			if testSuite.functionDefinition.id == functionId {
+				x = operationX($index)
+				y = operationY($index)
+
+				if $index > 1 {
+					$markup = Str.concat($markup, connectionMarkup($previousX, $previousY, x, y, "tests"))
+				}
+
+				$markup = Str.concat($markup, testSuiteNodeMarkup($index, testSuite))
+				$previousX = x
+				$previousY = y
+				$index = $index + 1
+
+				for testCase in testSuite.testCases {
+					testX = operationX($index)
+					testY = operationY($index)
+					$markup = Str.concat($markup, connectionMarkup($previousX, $previousY, testX, testY, "case"))
+					$markup = Str.concat($markup, testCaseNodeMarkup($index, testSuite, testCase))
+					$previousX = testX
+					$previousY = testY
+					$index = $index + 1
+				}
+			}
+		}
+
+		Str.concat($markup, "</rocitect-blueprint>")
+	}
+
 	findFunction : Str, List(UnitOperations.FunctionDefinition(customPrimitive, customCollection, customLogic, customPerformanceValue, customPerformanceUnit)) -> FindFunctionResult(customPrimitive, customCollection, customLogic, customPerformanceValue, customPerformanceUnit)
 	findFunction = |id, functionDefinitions| {
 		for functionDefinition in functionDefinitions {
@@ -222,13 +280,15 @@ BlueprintGeneration := [].{
 		NotFound
 	}
 
-	generateBlueprintPage : Str, Str, List(UnitOperations.FunctionDefinition(customPrimitive, customCollection, customLogic, customPerformanceValue, customPerformanceUnit)) -> Str
-	generateBlueprintPage = |kind, id, functionDefinitions|
+	generateBlueprintPage : Str, Str, List(UnitOperations.FunctionDefinition(customPrimitive, customCollection, customLogic, customPerformanceValue, customPerformanceUnit)), List(UnitOperations.TestSuite(customPrimitive, customCollection, customLogic, customPerformanceValue, customPerformanceUnit)) -> Str
+	generateBlueprintPage = |kind, id, functionDefinitions, testSuites|
 		if kind == "function" {
 			match findFunction(id, functionDefinitions) {
 				Found(functionDefinition) => unitOperationFlowMarkup(functionDefinition)
 				NotFound => functionFlowMarkup(functionDefinitions)
 			}
+		} else if kind == "test" {
+			testFlowMarkup(id, testSuites)
 		} else {
 			functionFlowMarkup(functionDefinitions)
 		}
@@ -261,6 +321,18 @@ sampleFunction = {
 	],
 }
 
-expect BlueprintGeneration.generateBlueprintPage("", "", [sampleFunction]).contains("rocitect-function-node")
+sampleTestSuite : UnitOperations.TestSuite({}, {}, {}, U64, Str)
+sampleTestSuite = {
+	id: "test:normalize-name",
+	name: "NormalizeName Tests",
+	functionDefinition: sampleFunction,
+	testCases: [{ name: "trims spaces", description: "Returns the input without surrounding whitespace." }],
+}
 
-expect BlueprintGeneration.generateBlueprintPage("function", "function:normalize-name", [sampleFunction]).contains("Unit operation")
+expect BlueprintGeneration.generateBlueprintPage("", "", [sampleFunction], [sampleTestSuite]).contains("rocitect-function-node")
+
+expect BlueprintGeneration.generateBlueprintPage("", "", [sampleFunction], [sampleTestSuite]).contains("View tests")
+
+expect BlueprintGeneration.generateBlueprintPage("function", "function:normalize-name", [sampleFunction], [sampleTestSuite]).contains("Unit operation")
+
+expect BlueprintGeneration.generateBlueprintPage("test", "function:normalize-name", [sampleFunction], [sampleTestSuite]).contains("Test case")
